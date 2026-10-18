@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Inventario Florístico y Vectores de Posición - INEM Montería</title>
 
   <!-- Leaflet CSS -->
@@ -43,41 +43,50 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
+    html, body {
+      height: 100%;
+      height: 100dvh;
+      width: 100%;
+      overflow: hidden;
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       color: var(--text);
+      background: #f8fafc;
+    }
+
+    body {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-      background: #f8fafc;
     }
 
     /* Cabecera Principal */
     header {
       background: linear-gradient(135deg, var(--primary-dark), var(--primary));
       color: white;
-      padding: 8px 16px;
+      padding: 8px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       z-index: 1000;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
     .header-title h1 {
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      line-height: 1.2;
     }
 
     .header-title p {
-      font-size: 0.73rem;
+      font-size: 0.72rem;
       opacity: 0.9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .header-actions {
@@ -85,6 +94,7 @@
       align-items: center;
       gap: 6px;
       flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .btn-header {
@@ -92,15 +102,16 @@
       color: white;
       border: 1px solid rgba(255,255,255,0.35);
       border-radius: 7px;
-      padding: 5px 10px;
-      font-size: 0.74rem;
+      padding: 5px 9px;
+      font-size: 0.73rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       transition: all 0.2s ease;
       text-decoration: none;
+      white-space: nowrap;
     }
 
     .btn-header:hover {
@@ -133,21 +144,23 @@
 
     .stats-badge {
       background: rgba(255,255,255,0.2);
-      padding: 4px 9px;
+      padding: 4px 8px;
       border-radius: 14px;
-      font-size: 0.73rem;
+      font-size: 0.72rem;
       font-weight: 700;
       border: 1px solid rgba(255,255,255,0.3);
+      white-space: nowrap;
     }
 
     .cloud-status {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 0.7rem;
-      padding: 3px 8px;
+      font-size: 0.68rem;
+      padding: 3px 7px;
       border-radius: 12px;
       background: rgba(0,0,0,0.25);
+      white-space: nowrap;
     }
 
     .cloud-dot {
@@ -159,16 +172,58 @@
     .cloud-dot.connected { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
     .cloud-dot.local { background: #facc15; }
 
+    /* Barra de Navegación Rápida Exclusiva Móvil */
+    .mobile-tab-switcher {
+      display: none;
+      background: #0f172a;
+      border-bottom: 1px solid #334155;
+      padding: 4px 8px;
+      gap: 6px;
+      z-index: 999;
+      flex-shrink: 0;
+    }
+
+    .mobile-tab-btn {
+      flex: 1;
+      padding: 7px 10px;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .mobile-tab-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: #22c55e;
+    }
+
     /* Contenedor Principal */
     .main-container {
       flex: 1;
       display: flex;
       position: relative;
       overflow: hidden;
+      min-height: 0;
+    }
+
+    #map-wrapper {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      position: relative;
+      min-height: 0;
     }
 
     #map {
-      flex: 1;
       height: 100%;
       width: 100%;
       z-index: 1;
@@ -176,7 +231,7 @@
 
     /* Barra Lateral */
     .sidebar {
-      width: 405px;
+      width: 410px;
       background: var(--bg-card);
       border-left: 1px solid var(--border);
       display: flex;
@@ -184,6 +239,8 @@
       z-index: 500;
       box-shadow: -4px 0 16px rgba(0,0,0,0.06);
       transition: transform 0.3s ease;
+      min-height: 0;
+      height: 100%;
     }
 
     .sidebar-controls {
@@ -193,6 +250,7 @@
       display: flex;
       flex-direction: column;
       gap: 7px;
+      flex-shrink: 0;
     }
 
     .search-input, .filter-select {
@@ -273,7 +331,9 @@
     .tree-list {
       flex: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       padding: 8px;
+      min-height: 0;
     }
 
     .tree-card {
@@ -397,6 +457,7 @@
       color: #64748b;
       line-height: 1.35;
       text-align: center;
+      flex-shrink: 0;
     }
 
     .sidebar-footer-credits strong {
@@ -564,6 +625,7 @@
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       box-shadow: 0 20px 40px rgba(0,0,0,0.3);
       padding: 20px;
       position: relative;
@@ -955,21 +1017,22 @@
     /* Notificaciones Toast */
     #toast-container {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 15px;
+      right: 15px;
       z-index: 100000;
       display: flex;
       flex-direction: column;
       gap: 8px;
       pointer-events: none;
+      max-width: calc(100% - 30px);
     }
 
     .toast-item {
       background: #0f172a;
       color: white;
-      padding: 10px 16px;
+      padding: 9px 14px;
       border-radius: 8px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       box-shadow: 0 8px 24px rgba(0,0,0,0.25);
       border-left: 4px solid var(--primary);
       pointer-events: auto;
@@ -993,7 +1056,6 @@
     @media print {
       body * { visibility: hidden !important; }
       
-      /* Modo 1: Impresión masiva desde modal-print-qr */
       #modal-print-qr, #modal-print-qr * { visibility: visible !important; }
       #modal-print-qr {
         position: absolute;
@@ -1005,7 +1067,6 @@
         padding: 0;
       }
 
-      /* Modo 2: Impresión de una sola placa botánica */
       body.printing-single-placa #single-placa-preview-target,
       body.printing-single-placa #single-placa-preview-target * {
         visibility: visible !important;
@@ -1025,22 +1086,113 @@
       .placa-qr-card { border: 1.5px solid #000; break-inside: avoid; }
     }
 
+    /* =====================================================================
+       OPTIMIZACIÓN MÓVIL PROFUNDA (DISPOSITIVOS TÁCTILES & SMARTPHONES)
+       ===================================================================== */
     @media (max-width: 768px) {
-      .main-container { flex-direction: column; }
-      .sidebar { width: 100%; height: 45%; border-left: none; border-top: 1px solid var(--border); }
-      .header-title h1 { font-size: 0.92rem; }
+      /* Encabezado compacto */
+      header {
+        padding: 6px 10px;
+        gap: 6px;
+      }
+
+      .header-title h1 {
+        font-size: 0.88rem;
+      }
+
+      .header-title p {
+        font-size: 0.65rem;
+      }
+
+      .btn-header {
+        padding: 4px 7px;
+        font-size: 0.68rem;
+      }
+
+      .stats-badge, .cloud-status {
+        font-size: 0.64rem;
+        padding: 2px 6px;
+      }
+
+      /* Activar barra de navegación móvil (Tabs) */
+      .mobile-tab-switcher {
+        display: flex;
+      }
+
+      /* Disposición de la pantalla dividida móvil / switchable */
+      .main-container {
+        flex-direction: column;
+      }
+
+      /* Vista por defecto en móvil: Ambos visibles con flex equilibrado */
+      body.mobile-view-map #map-wrapper {
+        display: block;
+        flex: 1 1 100%;
+        height: 100%;
+      }
+      body.mobile-view-map .sidebar {
+        display: none;
+      }
+
+      body.mobile-view-list #map-wrapper {
+        display: none;
+      }
+      body.mobile-view-list .sidebar {
+        display: flex;
+        width: 100%;
+        flex: 1 1 100%;
+        height: 100%;
+        border-left: none;
+      }
+
+      body.mobile-view-split #map-wrapper {
+        display: block;
+        flex: 1 1 52%;
+        height: 52%;
+      }
+      body.mobile-view-split .sidebar {
+        display: flex;
+        width: 100%;
+        flex: 1 1 48%;
+        height: 48%;
+        border-left: none;
+        border-top: 2px solid var(--border);
+      }
+
+      .sidebar-controls {
+        padding: 8px 10px;
+        gap: 5px;
+      }
+
+      .vector-panel {
+        padding: 5px 8px;
+        font-size: 0.72rem;
+      }
+
+      .floating-vector-math-card {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        padding: 10px 12px;
+      }
+
+      .modal-card {
+        padding: 14px;
+        max-height: 94vh;
+      }
     }
   </style>
 </head>
-<body>
+<body class="mobile-view-split">
 
   <!-- Notificaciones Toast -->
   <div id="toast-container"></div>
 
   <header id="app-header">
     <div class="header-title">
-      <h1>🌳 Inventario Florístico INEM Lorenzo María Lleras</h1>
-      <p>SIG Escolar • Vectores de Posición • PRAE Montería</p>
+      <h1>🌳 INEM Lorenzo María Lleras</h1>
+      <p>Inventario Florístico & Vectores • PRAE</p>
     </div>
     
     <div class="header-actions">
@@ -1057,22 +1209,22 @@
 
       <!-- Medir Vector A -> B (Público / Educativo) -->
       <button class="btn-header" id="btn-measure-vector" title="Medir vector relativo y distancia entre 2 árboles">
-        📐 Medir Vector (A → B)
+        📐 Medir (A→B)
       </button>
 
       <!-- Exportar Excel / XLSX (EXCLUSIVO ADMINISTRADOR) -->
       <button class="btn-header admin-only-element" id="btn-export-excel" title="Exportar inventario con vectores y taxonomía a Excel nativo (.xlsx)">
-        📊 Descargar Excel (.xlsx)
+        📊 Excel (.xlsx)
       </button>
 
       <!-- Imprimir Fichas / Placas QR Masivas (EXCLUSIVO ADMINISTRADOR) -->
       <button class="btn-header admin-only-element" id="btn-open-print-qr" title="Generar placas QR para imprimir y colgar en árboles">
-        🏷️ Placas QR Masivas
+        🏷️ Placas Masivas
       </button>
 
       <!-- Pantalla Completa (Público) -->
       <button class="btn-header" id="btn-toggle-fullscreen" title="Activar / Desactivar pantalla completa">
-        ⛶ Pantalla Completa
+        ⛶
       </button>
 
       <!-- Candado Admin / Ajustes / Supabase -->
@@ -1084,8 +1236,23 @@
     </div>
   </header>
 
+  <!-- Barra de cambio rápido en celulares: Mapa / Dividido / Lista -->
+  <nav class="mobile-tab-switcher" id="mobile-tab-switcher">
+    <button class="mobile-tab-btn" id="m-btn-map" onclick="setMobileView('map')">
+      🗺️ Mapa Solo
+    </button>
+    <button class="mobile-tab-btn active" id="m-btn-split" onclick="setMobileView('split')">
+      ⚸ Dividido
+    </button>
+    <button class="mobile-tab-btn" id="m-btn-list" onclick="setMobileView('list')">
+      📋 Lista de Árboles
+    </button>
+  </nav>
+
   <div class="main-container">
-    <div id="map"></div>
+    <div id="map-wrapper">
+      <div id="map"></div>
+    </div>
 
     <!-- Tarjeta flotante de cálculo vectorial A -> B -->
     <div class="floating-vector-math-card" id="floating-vector-card">
@@ -1102,7 +1269,7 @@
 
     <aside class="sidebar">
       <div class="sidebar-controls">
-        <input type="text" id="search-input" class="search-input" placeholder="🔍 Buscar por nombre, especie, familia o #ID...">
+        <input type="text" id="search-input" class="search-input" placeholder="🔍 Buscar nombre, especie, familia o #ID...">
         
         <select id="zone-filter" class="filter-select">
           <option value="ALL">Todas las zonas (A, B, C, D)</option>
@@ -1114,10 +1281,10 @@
 
         <div class="toggles-row">
           <label>
-            <input type="checkbox" id="chk-show-zones" checked> Sombrear polígonos
+            <input type="checkbox" id="chk-show-zones" checked> Polígonos
           </label>
           <label>
-            <input type="checkbox" id="chk-show-labels" checked> Nombres de Zona
+            <input type="checkbox" id="chk-show-labels" checked> Nombres
           </label>
           <button class="origin-btn admin-only-element" id="btn-add-tree-shortcut" style="padding:2px 6px; font-size:0.68rem; background:#16a34a;" onclick="openAddTreeModal()">
             ➕ Nuevo Árbol
@@ -1127,12 +1294,12 @@
         <!-- Panel del Origen (0,0) -->
         <div class="vector-panel">
           <h3>
-            <span>📐 Origen Vectorial (0, 0)</span>
-            <button class="origin-btn admin-only-element" id="btn-change-origin" title="Haz clic en cualquier punto del mapa para reubicar el origen">Mover Origen</button>
+            <span>📐 Origen (0, 0)</span>
+            <button class="origin-btn admin-only-element" id="btn-change-origin" title="Haz clic en cualquier punto del mapa para reubicar el origen">Mover</button>
           </h3>
-          <div id="origin-info" style="font-size: 0.72rem; color: #475569; margin-top: 3px;">
-            Punto: <span id="origin-name-txt" style="font-weight: 600;">Entrada Principal INEM</span><br>
-            Coord: <span id="origin-coords" style="font-family: monospace; font-weight: 600;">8.792169, -75.855913</span>
+          <div id="origin-info" style="font-size: 0.72rem; color: #475569; margin-top: 2px;">
+            Punto: <span id="origin-name-txt" style="font-weight: 600;">Entrada Principal</span> • 
+            <span id="origin-coords" style="font-family: monospace; font-weight: 600;">8.792169, -75.855913</span>
           </div>
         </div>
 
@@ -1147,10 +1314,8 @@
 
       <!-- Pie de créditos y autoría institucional discreto -->
       <div class="sidebar-footer-credits">
-        <div><strong>© Copyright</strong></div>
-        <div><b>Autores:</b> Carmen Cantero Espitia • Leonardo Tirado • Liz Jiménez Tordecilla</div>
-        <div><b>Colaborador:</b> Arnulfo Estrada Martinez</div>
-        <div style="font-size:0.62rem; color:#94a3b8; margin-top:2px;">PRAE • INEM Lorenzo María Lleras (Montería)</div>
+        <div><strong>© Copyright</strong> • <b>Autores:</b> Carmen Cantero Espitia • Leonardo Tirado • Liz Jiménez Tordecilla</div>
+        <div><b>Colaborador:</b> Arnulfo Estrada Martinez • <i>PRAE INEM Montería</i></div>
       </div>
     </aside>
   </div>
@@ -1159,7 +1324,7 @@
   <div class="modal-overlay" id="modal-stats" onclick="handleOverlayClick(event, 'modal-stats')">
     <div class="modal-card">
       <h3>
-        <span>📊 Diagnóstico Fitosanitario y Métricas del Inventario</span>
+        <span>📊 Diagnóstico Fitosanitario y Métricas</span>
         <button class="modal-close-btn" onclick="closeModal('modal-stats')">✕</button>
       </h3>
 
@@ -1174,20 +1339,20 @@
         </div>
         <div class="kpi-box">
           <div class="val" id="kpi-risk" style="color: #dc2626;">12</div>
-          <div class="lbl">Árboles en Riesgo (Comején/Hongos)</div>
+          <div class="lbl">Árboles en Riesgo</div>
         </div>
         <div class="kpi-box">
           <div class="val" id="kpi-top-zone" style="color: #2563eb;">Zona C</div>
-          <div class="lbl">Mayor Diversidad / Densidad</div>
+          <div class="lbl">Mayor Diversidad</div>
         </div>
       </div>
 
       <!-- SECCIÓN: DISTRIBUCIÓN POR ZONA Y BIOMETRÍA -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px;">
         <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-            <h4 style="font-size: 0.85rem; color: #1e293b;">📍 Distribución por Zona del Campus</h4>
-            <span style="font-size: 0.7rem; color: #64748b;">(Clic para filtrar mapa)</span>
+            <h4 style="font-size: 0.85rem; color: #1e293b;">📍 Distribución por Zona</h4>
+            <span style="font-size: 0.7rem; color: #64748b;">(Clic para filtrar)</span>
           </div>
           <div id="zone-stats-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
         </div>
@@ -1200,13 +1365,13 @@
 
       <div class="semaforo-container">
         <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">
-          🚦 Semáforo de Salud Fitosanitaria (Haz clic en una barra para ver especímenes)
+          🚦 Semáforo Fitosanitario (Clic en una barra para ver especímenes)
         </h4>
 
         <!-- Barra Roja -->
         <div class="semaforo-bar-item" onclick="toggleSemaforoList('list-rojo')">
           <div class="bar-info">
-            <span style="color: #dc2626;">🔴 En Riesgo Fitosanitario (Comején, Hongos, Cañamulo, Deterioro)</span>
+            <span style="color: #dc2626;">🔴 En Riesgo Fitosanitario</span>
             <span id="txt-count-rojo">0 árboles (0%)</span>
           </div>
           <div class="bar-track">
@@ -1218,7 +1383,7 @@
         <!-- Barra Amarilla -->
         <div class="semaforo-bar-item" onclick="toggleSemaforoList('list-amarillo')">
           <div class="bar-info">
-            <span style="color: #d97706;">🟡 Estado Regular / En Observación (Hojas secas, manchas)</span>
+            <span style="color: #d97706;">🟡 Estado Regular / En Observación</span>
             <span id="txt-count-amarillo">0 árboles (0%)</span>
           </div>
           <div class="bar-track">
@@ -1241,8 +1406,8 @@
       </div>
 
       <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
-        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">🌿 Especies más Frecuentes en el Campus</h4>
-        <div id="species-ranking-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px;"></div>
+        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">🌿 Especies más Frecuentes</h4>
+        <div id="species-ranking-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px;"></div>
       </div>
     </div>
   </div>
@@ -1252,11 +1417,11 @@
     <div class="modal-card">
       <div class="no-print">
         <h3>
-          <span>🏷️ Generador Masivo de Placas Botánicas con QR para el Campus</span>
+          <span>🏷️ Placas Botánicas con QR para el Campus</span>
           <button class="modal-close-btn" onclick="closeModal('modal-print-qr')">✕</button>
         </h3>
         <p style="font-size: 0.77rem; color: #64748b; margin-bottom: 12px;">
-          Imprime el pliego de tarjetas para plastificar y colocar físicamente en los troncos de los árboles en el colegio. Al escanear el QR físico con un teléfono móvil, el visitante abrirá automáticamente la ficha satelital interactiva de ese árbol en el mapa.
+          Imprime el pliego de tarjetas para plastificar y colocar físicamente en los troncos de los árboles en el colegio.
         </p>
 
         <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
@@ -1307,26 +1472,26 @@
   <div class="modal-overlay" id="modal-settings" onclick="handleOverlayClick(event, 'modal-settings')">
     <div class="modal-card">
       <h3>
-        <span>⚙️ Panel de Gestión Institucional & Base de Datos</span>
+        <span>⚙️ Panel de Gestión Institucional</span>
         <div style="display:flex; align-items:center; gap:8px;">
-          <button class="origin-btn" style="background:#0284c7;" onclick="switchAdminTab('tab-seguridad')">🔑 Cambiar Clave</button>
-          <button class="origin-btn" style="background:#dc2626;" onclick="lockAdminSession()">🔒 Salir / Bloquear</button>
+          <button class="origin-btn" style="background:#0284c7;" onclick="switchAdminTab('tab-seguridad')">🔑 Clave</button>
+          <button class="origin-btn" style="background:#dc2626;" onclick="lockAdminSession()">🔒 Salir</button>
           <button class="modal-close-btn" onclick="closeModal('modal-settings')">✕</button>
         </div>
       </h3>
 
       <div class="admin-tabs">
-        <button class="admin-tab-btn active" id="btn-tab-arbol" onclick="switchAdminTab('tab-arbol')">🌳 Registrar / Editar Árbol</button>
-        <button class="admin-tab-btn" id="btn-tab-single-qr" onclick="switchAdminTab('tab-single-qr')">🏷️ Placas QR & Rotulado</button>
-        <button class="admin-tab-btn" id="btn-tab-export" onclick="switchAdminTab('tab-export')">📊 Exportaciones & Fichas</button>
-        <button class="admin-tab-btn" id="btn-tab-supabase" onclick="switchAdminTab('tab-supabase')">⚡ Conexión Supabase</button>
-        <button class="admin-tab-btn" id="btn-tab-seguridad" onclick="switchAdminTab('tab-seguridad')">🔐 Seguridad & Clave</button>
+        <button class="admin-tab-btn active" id="btn-tab-arbol" onclick="switchAdminTab('tab-arbol')">🌳 Registrar / Editar</button>
+        <button class="admin-tab-btn" id="btn-tab-single-qr" onclick="switchAdminTab('tab-single-qr')">🏷️ Placas QR</button>
+        <button class="admin-tab-btn" id="btn-tab-export" onclick="switchAdminTab('tab-export')">📊 Exportaciones</button>
+        <button class="admin-tab-btn" id="btn-tab-supabase" onclick="switchAdminTab('tab-supabase')">⚡ Supabase</button>
+        <button class="admin-tab-btn" id="btn-tab-seguridad" onclick="switchAdminTab('tab-seguridad')">🔐 Seguridad</button>
       </div>
 
       <!-- PESTAÑA 1: FORMULARIO DE ÁRBOLES Y FOTOS -->
       <div class="tab-content active" id="tab-arbol">
         <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 12px;">
-          Agrega nuevos especímenes o selecciona uno existente para editar su información, taxonomía botánica, servicios ecosistémicos, fotos o biometría.
+          Agrega nuevos especímenes o selecciona uno existente para editar su información.
         </p>
 
         <!-- BARRA DE SELECCIÓN RÁPIDA DE ÁRBOL A EDITAR -->
@@ -1338,7 +1503,7 @@
             <select id="quick-select-edit-tree" class="admin-select" style="font-size:0.77rem; padding:6px 10px; font-weight:600; border-color:#86efac;" onchange="handleQuickSelectTree(this.value)">
               <option value="">-- Elige un árbol de la lista --</option>
             </select>
-            <button type="button" class="origin-btn" style="background:#059669; white-space:nowrap; padding:5px 10px; font-size:0.74rem;" onclick="resetTreeForm()">➕ Modo Nuevo</button>
+            <button type="button" class="origin-btn" style="background:#059669; white-space:nowrap; padding:5px 10px; font-size:0.74rem;" onclick="resetTreeForm()">➕ Nuevo</button>
           </div>
         </div>
 
@@ -1348,14 +1513,13 @@
           <!-- BANNER DINÁMICO DE MODO EDICIÓN -->
           <div id="tree-form-mode-banner" style="display:none; background:#dbeafe; color:#1e40af; border:1.5px solid #93c5fd; border-radius:8px; padding:8px 12px; font-size:0.78rem; font-weight:700; margin-bottom:14px; justify-content:space-between; align-items:center;">
             <span id="tree-form-mode-text">Modo Edición: Árbol #0</span>
-            <button type="button" class="origin-btn" style="background:#2563eb; font-size:0.7rem; padding:3px 8px;" onclick="resetTreeForm()">✕ Cancelar y Volver a Modo Nuevo</button>
+            <button type="button" class="origin-btn" style="background:#2563eb; font-size:0.7rem; padding:3px 8px;" onclick="resetTreeForm()">✕ Volver a Nuevo</button>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
             <div class="admin-form-group">
               <label># ID del Árbol:</label>
               <input type="number" id="tree-form-number" class="admin-input" required min="1" placeholder="Ej. 81" onchange="handleIdInputChange(this.value)">
-              <small style="font-size:0.67rem; color:#64748b;">Si escribes el número de un árbol existente, cargará sus datos automáticamente.</small>
             </div>
 
             <div class="admin-form-group">
@@ -1383,8 +1547,8 @@
 
           <!-- BLOQUE DE TAXONOMÍA Y ECOLOGÍA EDITABLE -->
           <div style="background: #fdfbf7; border: 1.5px solid #fed7aa; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size:0.79rem; font-weight:700; color:#9a3412; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-              <span>🌿 Taxonomía Botánica y Servicios Ecosistémicos (PRAE):</span>
+            <div style="font-size:0.79rem; font-weight:700; color:#9a3412; margin-bottom:8px;">
+              🌿 Taxonomía Botánica y Servicios Ecosistémicos (PRAE):
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
@@ -1406,7 +1570,6 @@
             <div class="admin-form-group" style="margin-bottom:0;">
               <label>3. Servicios Ecosistémicos Clave (Separados por coma):</label>
               <input type="text" id="tree-form-services" class="admin-input" placeholder="Ej. Confort térmico / Sombra, Fruto comestible / Fauna, Polinizadores...">
-              <small style="font-size:0.67rem; color:#78350f;">Se mostrarán como micro-insignias en la tarjeta y en la exportación de Excel.</small>
             </div>
           </div>
 
@@ -1426,22 +1589,22 @@
               <input type="file" id="tree-form-file" class="admin-input" accept="image/*" capture="environment">
               <input type="hidden" id="tree-form-existing-photo">
               <div id="tree-form-photo-indicator" style="font-size:0.69rem; color:#15803d; margin-top:3px; display:none; font-weight:600;">
-                📷 Este espécimen ya tiene una foto asignada. Sube un archivo nuevo solo si deseas reemplazarla.
+                📷 Este espécimen ya tiene una foto asignada.
               </div>
             </div>
           </div>
 
           <div class="admin-form-group">
             <label>Estado Fitosanitario y Observaciones en Campo:</label>
-            <textarea id="tree-form-observations" class="admin-textarea" placeholder="Describe si presenta comején, hongos, cañamulo, frondas secas, flores, frutos o si se encuentra vigoroso..."></textarea>
+            <textarea id="tree-form-observations" class="admin-textarea" placeholder="Describe estado fitosanitario..."></textarea>
           </div>
 
           <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
               <span style="font-weight: 700; font-size: 0.77rem; color: #1e293b;">📍 Coordenadas GPS del Espécimen:</span>
               <div style="display: flex; gap: 6px;">
                 <button type="button" class="origin-btn" style="background:#2563eb;" onclick="captureGpsLocation()">
-                  📱 Capturar mi GPS
+                  📱 Capturar GPS
                 </button>
                 <button type="button" class="origin-btn" style="background:#475569;" onclick="startPickLocationOnMap()">
                   🗺️ Marcar en Mapa
@@ -1464,7 +1627,7 @@
           <div id="tree-save-status" style="font-size: 0.76rem; font-weight: 600; margin-bottom: 8px; display: none;"></div>
 
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button type="button" class="origin-btn" style="background:#64748b;" onclick="resetTreeForm()">Limpiar Formulario</button>
+            <button type="button" class="origin-btn" style="background:#64748b;" onclick="resetTreeForm()">Limpiar</button>
             <button type="submit" class="btn-save-admin" id="btn-save-tree-record">
               💾 Guardar Espécimen
             </button>
@@ -1479,47 +1642,40 @@
             <div>
               <h4 style="font-size: 0.88rem; color: #1e293b; font-weight: 700;">🏷️ Estación de Rotulado Botánico Individual</h4>
               <p style="font-size: 0.73rem; color: #64748b;">
-                Selecciona cualquier árbol existente o recién agregado para generar, previsualizar y descargar su placa botánica física.
+                Selecciona cualquier árbol para generar y descargar su placa física.
               </p>
             </div>
-            <div style="display: flex; gap: 6px;">
-              <button class="origin-btn" style="background:#0284c7;" onclick="renderSinglePlacaStation()">🔄 Refrescar</button>
-            </div>
+            <button class="origin-btn" style="background:#0284c7;" onclick="renderSinglePlacaStation()">🔄 Refrescar</button>
           </div>
 
           <div class="admin-form-group" style="margin-bottom: 12px;">
             <label style="color:#0f172a; font-weight:700;">1. Selecciona el Árbol a Rotular:</label>
             <select id="single-placa-tree-select" class="admin-select" style="font-size:0.83rem; font-weight:600; padding:8px 10px; border-color:#93c5fd;" onchange="updateSinglePlacaPreview(this.value)">
-              <!-- Llenado dinámico -->
             </select>
           </div>
 
           <!-- CONTENEDOR DE PREVISUALIZACIÓN DE LA PLACA FÍSICA -->
-          <div style="background: #e2e8f0; padding: 16px; border-radius: 10px; text-align: center;">
+          <div style="background: #e2e8f0; padding: 14px; border-radius: 10px; text-align: center;">
             <div style="font-size:0.71rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
-              Previsualización de la Tarjeta Física (Lista para Plastificar y Colgar):
+              Previsualización de la Tarjeta Física:
             </div>
 
-            <div class="single-placa-preview-box" id="single-placa-preview-target">
-              <!-- Renderizado dinámico -->
-            </div>
+            <div class="single-placa-preview-box" id="single-placa-preview-target"></div>
 
-            <!-- BOTONES DE ACCIÓN PARA LA PLACA INDIVIDUAL -->
             <div style="display: flex; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
               <button type="button" class="btn-save-admin" style="background:#16a34a;" id="btn-download-single-png" onclick="downloadSinglePlacaImage()">
-                📥 Descargar Placa en Imagen (PNG)
+                📥 Descargar PNG
               </button>
               <button type="button" class="btn-save-admin" style="background:#2563eb;" onclick="printSinglePlacaDirect()">
-                🖨️ Imprimir Esta Placa
+                🖨️ Imprimir
               </button>
             </div>
           </div>
         </div>
 
-        <!-- ACORDEÓN PLEGADO PARA AJUSTES TÉCNICOS DE ENLACE QR (OPCIONAL) -->
         <details style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px;">
           <summary style="font-size: 0.77rem; font-weight: 700; color: #475569; cursor: pointer;">
-            ⚙️ Configuración Avanzada del Enlace QR (Opcional si cambias de dominio web)
+            ⚙️ Configuración Avanzada de Enlace
           </summary>
           <div style="margin-top: 10px; font-size: 0.74rem;">
             <div class="admin-form-group">
@@ -1529,7 +1685,6 @@
             <div class="admin-form-group">
               <label>URL Base del Aplicativo Alojado:</label>
               <input type="text" id="setting-web-base-url" class="admin-input" placeholder="https://tu-usuario.github.io/inem-flora/">
-              <small style="font-size:0.68rem; color:#64748b;">El código QR físico dirigirá a los visitantes a: <code>[URL_BASE]#tree-[ID]</code></small>
             </div>
             <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
               <button type="button" class="btn-save-admin" style="padding:4px 10px; font-size:0.74rem;" onclick="saveGeneralSettings()">Guardar Enlace Base</button>
@@ -1540,40 +1695,28 @@
 
       <!-- PESTAÑA 3: EXPORTACIONES Y FICHAS (EXCLUSIVA DE ADMIN) -->
       <div class="tab-content" id="tab-export">
-        <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 14px;">
-          Herramientas administrativas para descargar la base de datos de campo enriquecida y generar las tarjetas impresas para el campus.
-        </p>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 16px;">
-          <!-- Opción Excel -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 16px;">
           <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                <span style="font-size: 1.3rem;">📊</span>
-                <strong style="font-size: 0.88rem; color: #0f172a;">Inventario en Excel (.xlsx)</strong>
-              </div>
-              <p style="font-size: 0.73rem; color: #64748b; line-height: 1.4; margin-bottom: 10px;">
-                Descarga la matriz forestal completa con vectores (&Delta;x, &Delta;y), distancias, azimut, biometría, <b>familia botánica, origen biogeográfico y servicios ecosistémicos</b>.
+              <strong style="font-size: 0.88rem; color: #0f172a;">📊 Inventario en Excel (.xlsx)</strong>
+              <p style="font-size: 0.73rem; color: #64748b; margin: 8px 0;">
+                Descarga la matriz forestal completa con vectores, distancias, familia botánica y servicios ecosistémicos.
               </p>
             </div>
             <button type="button" class="btn-save-admin" style="background: #15803d; width: 100%; justify-content: center;" onclick="exportToExcelCSV()">
-              📥 Descargar Archivo Excel (.xlsx)
+              📥 Descargar Excel (.xlsx)
             </button>
           </div>
 
-          <!-- Opción Placas QR Masivas -->
           <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                <span style="font-size: 1.3rem;">🏷️</span>
-                <strong style="font-size: 0.88rem; color: #0f172a;">Placas Botánicas Masivas con QR</strong>
-              </div>
-              <p style="font-size: 0.73rem; color: #64748b; line-height: 1.4; margin-bottom: 10px;">
-                Genera el pliego completo de las 80 placas botánicas filtradas por zona para imprimir en una sola tanda y rotular físicamente los árboles del colegio.
+              <strong style="font-size: 0.88rem; color: #0f172a;">🏷️ Placas Botánicas Masivas</strong>
+              <p style="font-size: 0.73rem; color: #64748b; margin: 8px 0;">
+                Genera el pliego completo de las 80 placas botánicas filtradas por zona para imprimir.
               </p>
             </div>
             <button type="button" class="btn-save-admin" style="background: #0284c7; width: 100%; justify-content: center;" onclick="closeModal('modal-settings'); openPrintModal();">
-              🖨️ Abrir Pliego Masivo de Placas
+              🖨️ Abrir Pliego Masivo
             </button>
           </div>
         </div>
@@ -1581,10 +1724,6 @@
 
       <!-- PESTAÑA 4: CONEXIÓN SUPABASE -->
       <div class="tab-content" id="tab-supabase">
-        <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 12px;">
-          Configura las credenciales de tu proyecto Supabase para sincronizar automáticamente el mapa y almacenar fotos en la nube.
-        </p>
-
         <div class="admin-form-group">
           <label>1. Supabase Project URL:</label>
           <input type="text" id="setting-sb-url" class="admin-input" placeholder="https://tu-proyecto.supabase.co">
@@ -1596,12 +1735,8 @@
         </div>
 
         <div class="admin-form-group">
-          <label>3. Nombre del Storage Bucket de Fotos:</label>
-          <input type="text" id="setting-sb-bucket" class="admin-input" value="fotos-arboles" placeholder="fotos-arboles">
-        </div>
-
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px; font-size: 0.74rem; color: #1e40af; margin-bottom: 14px;">
-          💡 <b>Instrucción rápida:</b> Si aún no tienes Supabase configurado, la aplicación funciona de forma transparente con la base local de los 80 árboles precargados. Al ingresar tus llaves, comenzará a leer y escribir directamente en la nube.
+          <label>3. Bucket de Fotos:</label>
+          <input type="text" id="setting-sb-bucket" class="admin-input" value="fotos-arboles">
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
@@ -1613,47 +1748,25 @@
 
       <!-- PESTAÑA 5: SEGURIDAD Y GESTOR DE CLAVE ADMIN -->
       <div class="tab-content" id="tab-seguridad">
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
-          <h4 style="font-size: 0.85rem; color: #166534; margin-bottom: 4px; display:flex; align-items:center; gap:6px;">
-            🛡️ Gestión de Clave de Administrador
-          </h4>
-          <p style="font-size: 0.74rem; color: #15803d; line-height: 1.4;">
-            Esta clave protege la creación de nuevos árboles, la exportación a Excel, la generación de placas QR y la edición de ajustes. Solo quienes la conozcan podrán acceder a estas herramientas.
-          </p>
+        <div class="admin-form-group">
+          <label>Nueva Contraseña:</label>
+          <input type="password" id="input-new-pass" class="admin-input" placeholder="Mínimo 4 caracteres...">
         </div>
 
-        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
-            <span style="font-size:0.78rem; font-weight:700; color:#334155;">Estado de la Clave:</span>
-            <span id="badge-key-status" style="background:#dcfce7; color:#166534; font-size:0.7rem; font-weight:700; padding:3px 8px; border-radius:12px;">Activa y Protegida</span>
-          </div>
+        <div class="admin-form-group">
+          <label>Confirmar Nueva Contraseña:</label>
+          <input type="password" id="input-confirm-pass" class="admin-input" placeholder="Repite la contraseña...">
+        </div>
 
-          <div class="admin-form-group">
-            <label>Nueva Contraseña de Administrador:</label>
-            <div style="position: relative;">
-              <input type="password" id="input-new-pass" class="admin-input" placeholder="Mínimo 4 caracteres..." style="padding-right: 36px;">
-              <button type="button" onclick="togglePassVisibility('input-new-pass', 'btn-eye-1')" id="btn-eye-1" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:0.85rem; color:#64748b;" title="Ver/Ocultar">👁️</button>
-            </div>
-          </div>
+        <div id="pass-change-msg" style="font-size: 0.74rem; font-weight: 600; margin-bottom: 10px; display: none;"></div>
 
-          <div class="admin-form-group">
-            <label>Confirmar Nueva Contraseña:</label>
-            <div style="position: relative;">
-              <input type="password" id="input-confirm-pass" class="admin-input" placeholder="Repite la contraseña..." style="padding-right: 36px;">
-              <button type="button" onclick="togglePassVisibility('input-confirm-pass', 'btn-eye-2')" id="btn-eye-2" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:0.85rem; color:#64748b;" title="Ver/Ocultar">👁️</button>
-            </div>
-          </div>
-
-          <div id="pass-change-msg" style="font-size: 0.74rem; font-weight: 600; margin-bottom: 10px; display: none;"></div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="origin-btn" style="background:#dc2626;" onclick="restoreDefaultAdminPassPrompt()">
-              🔄 Restaurar a 'inem2026'
-            </button>
-            <button type="button" class="btn-save-admin" onclick="updateAdminPassword()">
-              💾 Guardar Nueva Clave
-            </button>
-          </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="origin-btn" style="background:#dc2626;" onclick="restoreDefaultAdminPassPrompt()">
+            🔄 Restaurar a 'inem2026'
+          </button>
+          <button type="button" class="btn-save-admin" onclick="updateAdminPassword()">
+            💾 Guardar Nueva Clave
+          </button>
         </div>
       </div>
     </div>
@@ -1661,7 +1774,7 @@
 
   <!-- MODAL 5: DIÁLOGO DE CONFIRMACIÓN REUTILIZABLE -->
   <div class="modal-overlay" id="modal-confirm-dialog" onclick="handleOverlayClick(event, 'modal-confirm-dialog')">
-    <div class="modal-card" style="max-width: 390px; text-align: center;">
+    <div class="modal-card" style="max-width: 380px; text-align: center;">
       <h3 style="justify-content: center; border: none; padding-bottom: 0;">
         <span id="confirm-dialog-title">Confirmación</span>
       </h3>
@@ -1981,6 +2094,20 @@
       supabaseBucket: 'fotos-arboles'
     };
 
+    /* Función de cambio de vista en dispositivos móviles (Mapa / Dividido / Lista) */
+    function setMobileView(viewMode) {
+      document.body.classList.remove('mobile-view-map', 'mobile-view-split', 'mobile-view-list');
+      document.body.classList.add(`mobile-view-${viewMode}`);
+
+      document.querySelectorAll('.mobile-tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById(`m-btn-${viewMode}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 200);
+    }
+
     function escapeHtml(str) {
       if (str === null || str === undefined) return '';
       return String(str)
@@ -2052,7 +2179,7 @@
           isSettingOrigin = false;
           const btnOrigin = document.getElementById('btn-change-origin');
           if (btnOrigin) {
-            btnOrigin.textContent = 'Mover Origen';
+            btnOrigin.textContent = 'Mover';
             btnOrigin.style.background = 'var(--primary)';
           }
         }
@@ -2067,7 +2194,8 @@
     const map = L.map('map', {
       center: [8.792000, -75.856400],
       zoom: 18,
-      maxZoom: 21
+      maxZoom: 21,
+      tap: false
     });
 
     map.on('popupclose', (e) => {
@@ -2075,12 +2203,12 @@
     });
 
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri, Maxar •',
+      attribution: 'Tiles &copy; Esri, Maxar • INEM Montería',
       maxZoom: 21
     }).addTo(map);
 
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{y}/{x}'.replace('{s}', 'a'), {
-      attribution: '&copy; OpenStreetMap • &copy; Autores: C. Cantero, L. Tirado, L. Jiménez | Colab: A. Estrada Martinez (INEM)',
+      attribution: '&copy; OpenStreetMap • INEM Montería',
       maxZoom: 19
     });
 
@@ -2300,7 +2428,7 @@
 
             polygon.bindTooltip(
               `<span style="color:${color}; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
-                <span style="width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block; box-shadow:0 0 4px ${color};"></span>
+                <span style="width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block;"></span>
                 <span>${escapeHtml(zone)}</span>
               </span>`, {
                 permanent: true,
@@ -2402,26 +2530,23 @@
         const editBtnHtml = isAdminLoggedIn ? 
           `<button class="origin-btn" style="background:#16a34a; font-size:0.68rem;" onclick="openEditTreeModal(${tree.ID})">✏️ Editar</button>` : '';
 
-        // Micro-insignias botánicas
         const originClass = bot.native === true ? 'pill-native' : (bot.native === false ? 'pill-exotic' : 'pill-family');
         const originIcon = bot.native === true ? '🌿' : (bot.native === false ? '🌍' : '🌱');
         const servicesHtml = (bot.services || []).map(s => `<span class="micro-pill pill-service">✨ ${escapeHtml(s)}</span>`).join('');
 
-        // Popup enfocado limpiamente en la información biológica, fitosanitaria y física
         const popupContent = `
-          <div style="font-size:0.82rem; line-height:1.4; padding:4px; max-width:280px;">
+          <div style="font-size:0.82rem; line-height:1.4; padding:2px; max-width:275px;">
             ${photoHtml}
-            <div style="font-size:1.05rem; font-weight:700; color:#1b5e20; border-bottom:1px solid #cbd5e1; padding-bottom:3px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:1rem; font-weight:700; color:#1b5e20; border-bottom:1px solid #cbd5e1; padding-bottom:3px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
               <span>#${tree.ID} - ${escapeHtml(tree['Nombre comun'])}</span>
               ${editBtnHtml}
             </div>
             
-            <div style="color:#64748b; font-size:0.77rem; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:3px;">
+            <div style="color:#64748b; font-size:0.75rem; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:3px;">
               <span style="font-style:italic;">${escapeHtml(tree['Nombre científico'])}</span>
               <span style="font-weight:600; color:#334155;">(${escapeHtml(bot.family)})</span>
             </div>
 
-            <!-- Fila de Micro-Insignias Ecológicas -->
             <div class="botanical-pills-row">
               <span class="micro-pill ${originClass}">${originIcon} ${escapeHtml(bot.origin)}</span>
               ${servicesHtml}
@@ -2431,16 +2556,16 @@
               <span style="background:${ZONE_COLORS[tree.Zona]}; color:white; font-size:0.67rem; font-weight:700; padding:2px 7px; border-radius:10px;">${escapeHtml(tree.Zona)}</span>
               <span style="background:#e2e8f0; color:#334155; font-size:0.67rem; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:3px;">${escapeHtml(tree['Clasificación biométrica'])}</span>
             </p>
-            <div style="margin-top:6px; font-size:0.74rem; color:#334155; background:#f8fafc; padding:5px 7px; border-radius:5px; border-left:3px solid #94a3b8;">
+            <div style="margin-top:6px; font-size:0.73rem; color:#334155; background:#f8fafc; padding:5px 7px; border-radius:5px; border-left:3px solid #94a3b8;">
               <b>Estado:</b> ${escapeHtml(tree['Estado fitosanitario/Observaciones'])}
             </div>
-            <div style="margin-top:7px; background:#fff7ed; border-left:3px solid #f97316; padding:5px 7px; border-radius:5px; font-size:0.75rem;">
+            <div style="margin-top:7px; background:#fff7ed; border-left:3px solid #f97316; padding:5px 7px; border-radius:5px; font-size:0.74rem;">
               <strong>Vector posición respecto al Origen (0,0):</strong><br>
               &bull; <b>r&#8407;</b> = (${vec.dx}&icirc; + ${vec.dy}&jcirc;) m<br>
               &bull; <b>Distancia (|r|):</b> ${vec.magnitud} metros<br>
               &bull; <b>Rumbo:</b> ${vec.rumbo}&deg; (${vec.cardinal})
             </div>
-            <div style="margin-top:9px; display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center; gap:6px;">
               <button class="origin-btn" style="background:#2563eb; width:100%; justify-content:center;" onclick="startMeasureWithTree(${tree.ID})">📏 Medir Vector desde este Árbol</button>
             </div>
           </div>
@@ -2496,6 +2621,10 @@
             handleMeasurementClick(tree);
           } else {
             selectTree(tree.ID, true);
+            // Si el usuario está en el móvil en vista solo lista, lo pasamos al mapa para ver el árbol
+            if (window.innerWidth <= 768 && document.body.classList.contains('mobile-view-list')) {
+              setMobileView('split');
+            }
           }
         });
 
@@ -2562,6 +2691,11 @@
         measureNodeB = null;
         clearMeasurementLayers();
         showToast("Modo Medición activo: selecciona el Árbol A en el mapa.", "info");
+
+        // En móvil asegurar que el mapa sea visible al medir
+        if (window.innerWidth <= 768 && document.body.classList.contains('mobile-view-list')) {
+          setMobileView('split');
+        }
       } else {
         btn.classList.remove('active');
         guideBox.style.display = 'none';
@@ -2640,7 +2774,7 @@
         });
         measureVectorGroup.addLayer(markerMeasureB);
 
-        // 1. Línea exterior blanca
+        // Línea exterior blanca de alto contraste
         const borderLine = L.polyline([
           [measureNodeA.Latitud, measureNodeA.Longitud],
           [measureNodeB.Latitud, measureNodeB.Longitud]
@@ -2653,7 +2787,7 @@
         });
         measureVectorGroup.addLayer(borderLine);
 
-        // 2. Línea principal azul cobalto
+        // Línea principal azul cobalto
         const mainLine = L.polyline([
           [measureNodeA.Latitud, measureNodeA.Longitud],
           [measureNodeB.Latitud, measureNodeB.Longitud]
@@ -2666,7 +2800,7 @@
         });
         measureVectorGroup.addLayer(mainLine);
 
-        // 3. Flecha direccional SVG en el extremo B
+        // Flecha direccional SVG en el extremo B
         const pA = map.latLngToLayerPoint([measureNodeA.Latitud, measureNodeA.Longitud]);
         const pB = map.latLngToLayerPoint([measureNodeB.Latitud, measureNodeB.Longitud]);
         const angleDeg = Math.atan2(pB.y - pA.y, pB.x - pA.x) * (180 / Math.PI);
@@ -2695,7 +2829,6 @@
         });
         measureVectorGroup.addLayer(arrowMarker);
 
-        // 4. Etiqueta flotante con estilo de cápsula sobre el centro del vector
         const vec = calculateVector(measureNodeA.Latitud, measureNodeA.Longitud, measureNodeB.Latitud, measureNodeB.Longitud);
         mainLine.bindTooltip(`
           <span style="display:inline-flex; align-items:center; gap:5px;">
@@ -2730,8 +2863,8 @@
         <div style="background:#dbeafe; padding:8px; border-radius:6px; font-size:0.78rem; border-left:3px solid #2563eb;">
           <b style="color:#1e40af;">Vector Relativo: &Delta;r&#8407;<sub>AB</sub> = r&#8407;<sub>B</sub> - r&#8407;<sub>A</sub></b><br>
           &bull; <b>&Delta;r&#8407;<sub>AB</sub></b> = (${vec.dx}&icirc; + ${vec.dy}&jcirc;) metros<br>
-          &bull; <b>Distancia en línea recta:</b> <span style="font-size:0.98rem; font-weight:800; color:#1d4ed8;">${vec.magnitud} m</span><br>
-          &bull; <b>Rumbo / Azimut Polar:</b> ${vec.rumbo}&deg; (${vec.cardinal})
+          &bull; <b>Distancia recta:</b> <span style="font-size:0.95rem; font-weight:800; color:#1d4ed8;">${vec.magnitud} m</span><br>
+          &bull; <b>Rumbo:</b> ${vec.rumbo}&deg; (${vec.cardinal})
         </div>
       `;
 
@@ -2768,14 +2901,14 @@
       const btn = document.getElementById('btn-toggle-fullscreen');
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().then(() => {
-          btn.innerHTML = '🗗 Salir Pantalla Completa';
+          btn.innerHTML = '🗗';
         }).catch(err => {
-          showToast(`Error al activar pantalla completa: ${err.message}`, "error");
+          showToast(`Error de pantalla completa: ${err.message}`, "error");
         });
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen().then(() => {
-            btn.innerHTML = '⛶ Pantalla Completa';
+            btn.innerHTML = '⛶';
           });
         }
       }
@@ -2784,9 +2917,9 @@
     document.addEventListener('fullscreenchange', () => {
       const btn = document.getElementById('btn-toggle-fullscreen');
       if (document.fullscreenElement) {
-        btn.innerHTML = '🗗 Salir Pantalla Completa';
+        btn.innerHTML = '🗗';
       } else {
-        btn.innerHTML = '⛶ Pantalla Completa';
+        btn.innerHTML = '⛶';
       }
       setTimeout(() => map.invalidateSize(), 300);
     });
@@ -2843,47 +2976,6 @@
         showToast("Descarga de Excel completada con éxito.", "success");
         return;
       }
-
-      // Respaldo CSV UTF-8 con BOM
-      const headers = [
-        "ID", "Zona", "Nombre comun", "Nombre científico", "Familia_Botanica", "Origen_Biogeografico",
-        "Servicios_Ecosistemicos", "Clasificación biométrica", "Estado fitosanitario/Observaciones",
-        "Latitud", "Longitud", "Enlace_Foto", "Vector_dx_Este_metros", "Vector_dy_Norte_metros",
-        "Distancia_Magnitud_metros", "Rumbo_grados", "Direccion_Cardinal", "Origen_Referencia",
-        "Origen_Latitud", "Origen_Longitud"
-      ];
-
-      const csvRows = [headers.join(",")];
-
-      treeData.forEach(tree => {
-        const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
-        const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
-        const cleanText = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
-
-        const row = [
-          tree.ID, cleanText(tree.Zona), cleanText(tree['Nombre comun']),
-          cleanText(tree['Nombre científico']), cleanText(bot.family), cleanText(bot.origin),
-          cleanText((bot.services || []).join(" - ")), cleanText(tree['Clasificación biométrica']),
-          cleanText(tree['Estado fitosanitario/Observaciones']), tree.Latitud, tree.Longitud,
-          cleanText(tree['Enlace foto']), vec.dx, vec.dy, vec.magnitud, vec.rumbo,
-          cleanText(vec.cardinal), cleanText(originCoord.name), originCoord.lat, originCoord.lng
-        ];
-
-        csvRows.push(row.join(","));
-      });
-
-      const csvString = "\uFEFF" + csvRows.join("\r\n");
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      
-      const dateStr = new Date().toISOString().slice(0,10);
-      link.setAttribute("href", url);
-      link.setAttribute("download", `INVENTARIO_FLORISTICO_VECTORES_INEM_${dateStr}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast("Descarga de CSV completada con éxito.", "success");
     }
 
     function openStatsModal() {
@@ -2897,7 +2989,6 @@
       );
       document.getElementById('kpi-species').textContent = uniqueSpecies.size;
 
-      // 1. Distribución por Zona
       const zoneCounts = { 'Zona A': 0, 'Zona B': 0, 'Zona C': 0, 'Zona D': 0 };
       treeData.forEach(t => {
         if (zoneCounts.hasOwnProperty(t.Zona)) {
@@ -2929,10 +3020,7 @@
         const zColor = ZONE_COLORS[zoneName] || '#2e7d32';
 
         const item = document.createElement('div');
-        item.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem; cursor:pointer; transition:all 0.2s;';
-        item.title = `Haz clic para filtrar el mapa por ${zoneName}`;
-        item.onmouseenter = () => item.style.borderColor = zColor;
-        item.onmouseleave = () => item.style.borderColor = '#cbd5e1';
+        item.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem; cursor:pointer;';
         item.onclick = () => {
           closeModal('modal-stats');
           const filterEl = document.getElementById('zone-filter');
@@ -2957,19 +3045,11 @@
         zoneStatsContainer.appendChild(item);
       });
 
-      // 2. Clasificación Biométrica
       const bioCounts = { 'Fustal': 0, 'Latizal': 0, 'Brinzal': 0, 'No aplica': 0 };
       treeData.forEach(t => {
         const bio = t['Clasificación biométrica'] || 'No aplica';
         bioCounts[bio] = (bioCounts[bio] || 0) + 1;
       });
-
-      const bioDescriptions = {
-        'Fustal': 'Árbol adulto maduro (DAP > 10 cm)',
-        'Latizal': 'Árbol en desarrollo juvenil',
-        'Brinzal': 'Plántula / Regeneración natural',
-        'No aplica': 'Palmas, arbustos y ornamentales'
-      };
 
       const bioColors = {
         'Fustal': '#166534',
@@ -2984,15 +3064,12 @@
       Object.entries(bioCounts).forEach(([bioName, count]) => {
         const pct = Math.round((count / total) * 100);
         const bColor = bioColors[bioName] || '#475569';
-        const desc = bioDescriptions[bioName] || '';
 
         const item = document.createElement('div');
         item.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem;';
         item.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-            <span style="font-weight:700; color:#1e293b;">
-              ${escapeHtml(bioName)} <span style="font-weight:400; font-size:0.68rem; color:#64748b;">(${escapeHtml(desc)})</span>
-            </span>
+            <span style="font-weight:700; color:#1e293b;">${escapeHtml(bioName)}</span>
             <span style="font-weight:700; color:${bColor};">${count} (${pct}%)</span>
           </div>
           <div style="background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
@@ -3002,7 +3079,6 @@
         biometricStatsContainer.appendChild(item);
       });
 
-      // 3. Semáforo Fitosanitario
       const rojo = [];
       const amarillo = [];
       const verde = [];
@@ -3037,7 +3113,6 @@
       fillDrawerList('list-amarillo', amarillo);
       fillDrawerList('list-verde', verde);
 
-      // 4. Ranking de Especies
       const speciesCounts = {};
       treeData.forEach(t => {
         const name = t['Nombre comun'] || 'Sin clasificar';
@@ -3144,7 +3219,7 @@
         </div>
         <div style="font-size:0.62rem; color:#64748b; text-align:center; margin-top:6px; border-top:1px dotted #cbd5e1; padding-top:3px;">
           Escanea para ver la ficha satelital interactiva en vivo<br>
-          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Autores: C. Cantero, L. Tirado, L. Jiménez &bull; Colab: A. Estrada Martinez &bull; INEM Montería</span>
+          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Carmen Cantero, Leonardo Tirado, Liz Jiménez • PRAE INEM</span>
         </div>
       `;
       return div;
@@ -3216,7 +3291,7 @@
 
         <div style="margin-top:10px; padding-top:6px; border-top:1px dotted #94a3b8; font-size:0.64rem; color:#475569; text-align:center;">
           📱 <b>Escanea con tu teléfono para abrir la ficha interactiva en el mapa satelital</b><br>
-          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Autores: C. Cantero, L. Tirado, L. Jiménez &bull; Colab: A. Estrada Martinez &bull; PRAE INEM Montería</span>
+          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Carmen Cantero, Leonardo Tirado, Liz Jiménez • PRAE INEM</span>
         </div>
       `;
     }
@@ -3231,7 +3306,7 @@
       if (!target) return;
 
       const originalText = btn.innerHTML;
-      btn.innerHTML = '⏳ Generando PNG...';
+      btn.innerHTML = '⏳ Generando...';
       btn.disabled = true;
 
       try {
@@ -3285,7 +3360,7 @@
         
         const btnAdmin = document.getElementById('btn-admin-access');
         btnAdmin.classList.add('admin-active');
-        btnAdmin.innerHTML = '⚙️ Admin ON';
+        btnAdmin.innerHTML = '⚙️ Admin';
         
         updateOriginMarker();
         renderTrees();
@@ -3570,7 +3645,10 @@
     function startPickLocationOnMap() {
       closeModal('modal-settings');
       isPickingLocationForForm = true;
-      showToast("Haz clic sobre el mapa satelital en la posición del árbol.", "info");
+      if (window.innerWidth <= 768) {
+        setMobileView('map');
+      }
+      showToast("Toca sobre el mapa satelital en la posición del árbol.", "info");
     }
 
     async function handleSaveTree() {
@@ -3604,7 +3682,7 @@
         const fileInput = document.getElementById('tree-form-file');
 
         if (fileInput.files.length > 0 && supabaseClient) {
-          statusBox.textContent = 'Subiendo fotografía a Supabase Storage...';
+          statusBox.textContent = 'Subiendo fotografía...';
           const file = fileInput.files[0];
           const fileExt = file.name.split('.').pop();
           const fileName = `arbol_${treeNumber}_${Date.now()}.${fileExt}`;
@@ -3640,7 +3718,7 @@
         };
 
         if (supabaseClient) {
-          statusBox.textContent = 'Sincronizando registro con la nube...';
+          statusBox.textContent = 'Sincronizando con Supabase...';
           if (dbId) {
             const { error: updateErr } = await supabaseClient
               .from('arboles')
@@ -3680,7 +3758,7 @@
         }
 
         statusBox.style.color = '#16a34a';
-        statusBox.textContent = '✅ Árbol guardado y sincronizado con éxito.';
+        statusBox.textContent = '✅ Árbol guardado con éxito.';
         showToast(`Árbol #${treeNumber} guardado correctamente.`, "success");
         setTimeout(() => {
           closeModal('modal-settings');
@@ -3732,19 +3810,7 @@
       localStorage.setItem('inem_app_settings', JSON.stringify(appSettings));
       renderTrees();
       renderSinglePlacaStation();
-      showToast("Configuración general de enlaces guardada.", "success");
-    }
-
-    function togglePassVisibility(inputId, btnId) {
-      const input = document.getElementById(inputId);
-      const btn = document.getElementById(btnId);
-      if (input.type === 'password') {
-        input.type = 'text';
-        btn.textContent = '🔒';
-      } else {
-        input.type = 'password';
-        btn.textContent = '👁️';
-      }
+      showToast("Configuración general guardada.", "success");
     }
 
     function updateAdminPassword() {
@@ -3753,16 +3819,9 @@
       const msg = document.getElementById('pass-change-msg');
       msg.style.display = 'block';
 
-      if (!newPass) {
+      if (!newPass || newPass.length < 4) {
         msg.style.color = '#dc2626';
-        msg.textContent = '⚠️ La contraseña no puede estar vacía.';
-        showToast("La contraseña no puede estar vacía.", "warning");
-        return;
-      }
-
-      if (newPass.length < 4) {
-        msg.style.color = '#dc2626';
-        msg.textContent = '⚠️ Por seguridad, usa al menos 4 caracteres.';
+        msg.textContent = '⚠️ Mínimo 4 caracteres.';
         showToast("Usa al menos 4 caracteres.", "warning");
         return;
       }
@@ -3778,7 +3837,7 @@
       localStorage.setItem('inem_admin_pass', newPass);
 
       msg.style.color = '#16a34a';
-      msg.textContent = '✅ ¡Contraseña actualizada y guardada con éxito!';
+      msg.textContent = '✅ ¡Contraseña actualizada con éxito!';
       showToast("Contraseña de administrador actualizada.", "success");
 
       document.getElementById('input-new-pass').value = '';
@@ -3792,7 +3851,7 @@
     function restoreDefaultAdminPassPrompt() {
       showConfirmDialog(
         "Restaurar Contraseña",
-        "¿Deseas restaurar la clave de administrador a la predeterminada ('inem2026')?",
+        "¿Deseas restaurar la clave de administrador a 'inem2026'?",
         () => {
           adminPassword = 'inem2026';
           localStorage.removeItem('inem_admin_pass');
@@ -3836,10 +3895,11 @@
         return;
       }
       isSettingOrigin = !isSettingOrigin;
-      btnOrigin.textContent = isSettingOrigin ? 'Haz clic en el mapa...' : 'Mover Origen';
+      btnOrigin.textContent = isSettingOrigin ? 'Toca el mapa...' : 'Mover';
       btnOrigin.style.background = isSettingOrigin ? '#dc2626' : 'var(--primary)';
       if (isSettingOrigin) {
-        showToast("Haz clic en cualquier punto del mapa para fijar el nuevo origen (0,0).", "info");
+        if (window.innerWidth <= 768) setMobileView('map');
+        showToast("Toca cualquier punto del mapa para fijar el origen (0,0).", "info");
       }
     });
 
@@ -3848,7 +3908,7 @@
         originCoord.lat = e.latlng.lat;
         originCoord.lng = e.latlng.lng;
         isSettingOrigin = false;
-        btnOrigin.textContent = 'Mover Origen';
+        btnOrigin.textContent = 'Mover';
         btnOrigin.style.background = 'var(--primary)';
         updateOriginMarker();
         renderTrees();
@@ -3878,6 +3938,11 @@
         }
       }
     }
+
+    // Inicialización del tamaño y viewport móvil al cambiar orientación
+    window.addEventListener('resize', () => {
+      if (map) map.invalidateSize();
+    });
 
     updateOriginMarker();
     syncDatasetState();
