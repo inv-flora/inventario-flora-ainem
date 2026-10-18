@@ -1,0 +1,3890 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario Florístico y Vectores de Posición - INEM Montería</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- SheetJS (Librería para exportación nativa Excel .xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Supabase JS v2 Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Generador QR ultraligero y libre de dependencias externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+  <!-- html2canvas para captura y descarga directa de placas individuales en imagen HD -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1b5e20;
+      --primary-light: #2e7d32;
+      --primary-dark: #0d3b13;
+      --accent: #f59e0b;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #16a34a;
+      --bg-card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 4px 14px rgba(0,0,0,0.08);
+
+      --color-zona-a: #2e7d32;
+      --color-zona-b: #1565c0;
+      --color-zona-c: #e65100;
+      --color-zona-d: #7b1fa2;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    /* Cabecera Principal */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: white;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 1000;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .header-title h1 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title p {
+      font-size: 0.73rem;
+      opacity: 0.9;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn-header {
+      background: rgba(255,255,255,0.18);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-header:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-header.active {
+      background: #f59e0b;
+      color: #78350f;
+      border-color: #d97706;
+      font-weight: 700;
+    }
+
+    .btn-header.admin-active {
+      background: #22c55e;
+      color: #052e16;
+      border-color: #16a34a;
+      font-weight: 700;
+    }
+
+    /* Elementos exclusivos para Administrador */
+    .admin-only-element {
+      display: none !important;
+    }
+
+    body.admin-logged .admin-only-element {
+      display: inline-flex !important;
+    }
+
+    .stats-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 4px 9px;
+      border-radius: 14px;
+      font-size: 0.73rem;
+      font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .cloud-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.25);
+    }
+
+    .cloud-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #cbd5e1;
+    }
+    .cloud-dot.connected { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+    .cloud-dot.local { background: #facc15; }
+
+    /* Contenedor Principal */
+    .main-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+    }
+
+    /* Barra Lateral */
+    .sidebar {
+      width: 405px;
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 500;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.06);
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-controls {
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .search-input, .filter-select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.81rem;
+      outline: none;
+      background: white;
+    }
+
+    .search-input:focus, .filter-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
+    }
+
+    .toggles-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.73rem;
+      color: #475569;
+      padding: 1px 2px;
+    }
+
+    .toggles-row label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .vector-panel {
+      background: #f1f8f3;
+      border: 1px solid #c8e6c9;
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 0.76rem;
+    }
+
+    .vector-panel h3 {
+      color: var(--primary-dark);
+      font-size: 0.81rem;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .origin-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s ease;
+    }
+
+    .origin-btn:hover { background: var(--primary-light); }
+
+    .measure-guide-box {
+      background: #eff6ff;
+      border: 1.5px solid #60a5fa;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 0.74rem;
+      display: none;
+      box-shadow: 0 2px 6px rgba(37,99,235,0.08);
+    }
+
+    .tree-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .tree-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin-bottom: 7px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .tree-card:hover {
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+    }
+
+    .tree-card.active {
+      border-left: 4px solid var(--primary);
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+
+    .tree-card h4 {
+      font-size: 0.84rem;
+      color: #0f172a;
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .zone-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      color: white;
+    }
+
+    .tree-card .scientific {
+      font-size: 0.73rem;
+      font-style: italic;
+      color: #64748b;
+      margin-bottom: 3px;
+    }
+
+    /* Micro-insignias botánicas y ecológicas */
+    .botanical-pills-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 4px 0 6px 0;
+    }
+
+    .micro-pill {
+      font-size: 0.64rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      line-height: 1.15;
+      letter-spacing: 0.2px;
+    }
+
+    .micro-pill.pill-native {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    .micro-pill.pill-exotic {
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .micro-pill.pill-family {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      font-style: italic;
+    }
+
+    .micro-pill.pill-service {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    .tree-card .vector-preview {
+      font-size: 0.71rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 4px 7px;
+      border-radius: 5px;
+      color: #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .thumb-mini {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      object-fit: cover;
+      border: 1px solid #cbd5e1;
+    }
+
+    /* Pie de créditos institucional */
+    .sidebar-footer-credits {
+      padding: 7px 12px;
+      background: #f1f5f9;
+      border-top: 1px solid var(--border);
+      font-size: 0.64rem;
+      color: #64748b;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    .sidebar-footer-credits strong {
+      color: #334155;
+      font-weight: 700;
+    }
+
+    /* Marcadores SVG de árboles */
+    .tree-marker-container {
+      position: relative;
+      width: 32px;
+      height: 40px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .tree-marker-container:hover {
+      transform: scale(1.22);
+      z-index: 9999 !important;
+    }
+
+    .tree-marker-container svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45));
+    }
+
+    /* Iconos del Origen y Mediciones */
+    .origin-marker-icon {
+      background: #dc2626;
+      color: white;
+      border: 2px solid white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 14px;
+      box-shadow: 0 0 0 3px rgba(220,38,38,0.4), 0 3px 8px rgba(0,0,0,0.5);
+      cursor: grab;
+    }
+
+    /* Nodos A y B con badges pulsantes */
+    .measure-badge-icon {
+      color: white;
+      border: 2.5px solid white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 13px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .measure-badge-icon.node-a {
+      background: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.45), 0 4px 10px rgba(0,0,0,0.5);
+      animation: pulse-node-a 1.8s infinite;
+    }
+    .measure-badge-icon.node-b {
+      background: #ea580c;
+      box-shadow: 0 0 0 3px rgba(234,88,12,0.45), 0 4px 10px rgba(0,0,0,0.5);
+      animation: pulse-node-b 1.8s infinite;
+    }
+
+    @keyframes pulse-node-a {
+      0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.7), 0 4px 10px rgba(0,0,0,0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(37,99,235,0), 0 4px 10px rgba(0,0,0,0.5); }
+      100% { box-shadow: 0 0 0 0 rgba(37,99,235,0), 0 4px 10px rgba(0,0,0,0.5); }
+    }
+
+    @keyframes pulse-node-b {
+      0% { box-shadow: 0 0 0 0 rgba(234,88,12,0.7), 0 4px 10px rgba(0,0,0,0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(234,88,12,0), 0 4px 10px rgba(0,0,0,0.5); }
+      100% { box-shadow: 0 0 0 0 rgba(234,88,12,0), 0 4px 10px rgba(0,0,0,0.5); }
+    }
+
+    /* Flecha direccional SVG entre A y B */
+    .vector-arrowhead-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+      pointer-events: none;
+    }
+    .vector-arrowhead-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Tooltip de etiqueta central sobre la línea vectorial A -> B */
+    .leaflet-tooltip.measure-vector-pill-tooltip {
+      background: rgba(15, 23, 42, 0.94) !important;
+      color: #ffffff !important;
+      border: 1.5px solid #60a5fa !important;
+      border-radius: 20px !important;
+      padding: 4px 10px !important;
+      font-size: 0.74rem !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.3px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3) !important;
+      white-space: nowrap;
+    }
+    .leaflet-tooltip.measure-vector-pill-tooltip::before {
+      display: none !important;
+    }
+
+    /* Tarjeta flotante de medición vectorial A -> B */
+    .floating-vector-math-card {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 900;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      border: 1px solid #93c5fd;
+      border-left: 5px solid #2563eb;
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      max-width: 360px;
+      font-size: 0.8rem;
+      display: none;
+      animation: slideUpFade 0.25s ease-out;
+    }
+
+    @keyframes slideUpFade {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .floating-vector-math-card h4 {
+      color: #1e3a8a;
+      font-size: 0.87rem;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Modales */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 99999;
+      display: none !important;
+      align-items: center;
+      justify-content: center;
+      padding: 15px;
+    }
+
+    .modal-overlay.active {
+      display: flex !important;
+    }
+
+    .modal-card {
+      background: white;
+      border-radius: 12px;
+      max-width: 860px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      padding: 20px;
+      position: relative;
+    }
+
+    .modal-card h3 {
+      font-size: 1.12rem;
+      color: #0f172a;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close-btn {
+      background: #f1f5f9;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #475569;
+    }
+
+    .modal-close-btn:hover { background: #e2e8f0; color: #0f172a; }
+
+    /* Pestañas de Administración */
+    .admin-tabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .admin-tab-btn {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      padding: 6px 12px;
+      border-radius: 6px 6px 0 0;
+      font-size: 0.77rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #475569;
+    }
+
+    .admin-tab-btn.active {
+      background: white;
+      color: var(--primary);
+      border-top: 2px solid var(--primary);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Formularios */
+    .admin-form-group {
+      margin-bottom: 12px;
+    }
+
+    .admin-form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #334155;
+    }
+
+    .admin-input, .admin-select, .admin-textarea {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.81rem;
+      outline: none;
+      background: white;
+    }
+
+    .admin-textarea {
+      resize: vertical;
+      min-height: 55px;
+    }
+
+    .admin-input:focus, .admin-select:focus, .admin-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(46,125,50,0.15);
+    }
+
+    .btn-save-admin {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-save-admin:hover { background: var(--primary-light); }
+
+    /* Semáforo & KPIs */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .kpi-box .val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .kpi-box .lbl {
+      font-size: 0.71rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .semaforo-container {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+
+    .semaforo-bar-item {
+      margin-bottom: 10px;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 4px;
+      transition: background 0.2s;
+    }
+
+    .semaforo-bar-item:hover { background: #edf2f7; }
+
+    .bar-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.77rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .bar-track {
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .tree-sublist-drawer {
+      margin-top: 8px;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .tree-sublist-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.74rem;
+    }
+
+    .tree-sublist-item:hover { background: #f8fafc; }
+
+    .btn-goto-tree {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Placas para impresión masiva e individual */
+    .print-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .placa-qr-card {
+      border: 2px dashed #0f172a;
+      border-radius: 10px;
+      padding: 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+
+    .placa-qr-header {
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .placa-qr-header h5 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+    }
+
+    .placa-qr-body {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .placa-qr-body .qr-render {
+      width: 80px;
+      height: 80px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .placa-qr-body .qr-render svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .placa-qr-info {
+      flex: 1;
+      font-size: 0.74rem;
+      line-height: 1.35;
+    }
+
+    .placa-qr-info strong {
+      font-size: 0.88rem;
+      color: #0f172a;
+      display: block;
+    }
+
+    .placa-qr-info em {
+      color: #64748b;
+      font-size: 0.7rem;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    /* ESTACIÓN DE ROTULADO INDIVIDUAL (PESTAÑA ADMIN QR) */
+    .single-placa-station {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .single-placa-preview-box {
+      max-width: 440px;
+      margin: 12px auto;
+      background: white;
+      border: 2px dashed #0f172a;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    }
+
+    .single-placa-preview-box .qr-render-large {
+      width: 100px;
+      height: 100px;
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border-radius: 6px;
+    }
+
+    .single-placa-preview-box .qr-render-large svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Estilos sincronizados para las etiquetas de Zona */
+    .zone-badge-label {
+      background: rgba(255, 255, 255, 0.94) !important;
+      backdrop-filter: blur(4px);
+      border-radius: 20px !important;
+      padding: 3px 10px !important;
+      font-size: 0.72rem !important;
+      font-weight: 700 !important;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+      transition: all 0.25s ease !important;
+      pointer-events: none;
+      letter-spacing: 0.3px;
+    }
+    .zone-badge-label::before {
+      display: none !important;
+    }
+
+    .zone-badge-label.label-zona-a,
+    .leaflet-tooltip.label-zona-a {
+      border: 1.5px solid #2e7d32 !important;
+      color: #2e7d32 !important;
+      background: rgba(255, 255, 255, 0.94) !important;
+    }
+    .zone-badge-label.label-zona-b,
+    .leaflet-tooltip.label-zona-b {
+      border: 1.5px solid #1565c0 !important;
+      color: #1565c0 !important;
+      background: rgba(255, 255, 255, 0.94) !important;
+    }
+    .zone-badge-label.label-zona-c,
+    .leaflet-tooltip.label-zona-c {
+      border: 1.5px solid #e65100 !important;
+      color: #e65100 !important;
+      background: rgba(255, 255, 255, 0.94) !important;
+    }
+    .zone-badge-label.label-zona-d,
+    .leaflet-tooltip.label-zona-d {
+      border: 1.5px solid #7b1fa2 !important;
+      color: #7b1fa2 !important;
+      background: rgba(255, 255, 255, 0.94) !important;
+    }
+
+    .map-zoomed-in .zone-badge-label {
+      opacity: 0 !important;
+      transform: scale(0.85);
+    }
+
+    /* Fotos en Popup */
+    .tree-popup-photo {
+      width: 100%;
+      height: 130px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+    }
+
+    /* Notificaciones Toast */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      background: #0f172a;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      border-left: 4px solid var(--primary);
+      pointer-events: auto;
+      transition: all 0.3s ease;
+      opacity: 0;
+      transform: translateY(-10px);
+      max-width: 320px;
+    }
+
+    .toast-item.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast-item.toast-success { border-left-color: #22c55e; }
+    .toast-item.toast-error { border-left-color: #ef4444; }
+    .toast-item.toast-warning { border-left-color: #f59e0b; }
+    .toast-item.toast-info { border-left-color: #3b82f6; }
+
+    /* Estilos de Impresión */
+    @media print {
+      body * { visibility: hidden !important; }
+      
+      /* Modo 1: Impresión masiva desde modal-print-qr */
+      #modal-print-qr, #modal-print-qr * { visibility: visible !important; }
+      #modal-print-qr {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white !important;
+        display: block !important;
+        padding: 0;
+      }
+
+      /* Modo 2: Impresión de una sola placa botánica */
+      body.printing-single-placa #single-placa-preview-target,
+      body.printing-single-placa #single-placa-preview-target * {
+        visibility: visible !important;
+      }
+      body.printing-single-placa #single-placa-preview-target {
+        position: fixed;
+        left: 50%;
+        top: 40px;
+        transform: translateX(-50%);
+        width: 140mm !important;
+        border: 2px dashed #000 !important;
+        box-shadow: none !important;
+      }
+
+      .modal-card { box-shadow: none; max-width: 100%; padding: 0; }
+      .no-print { display: none !important; }
+      .placa-qr-card { border: 1.5px solid #000; break-inside: avoid; }
+    }
+
+    @media (max-width: 768px) {
+      .main-container { flex-direction: column; }
+      .sidebar { width: 100%; height: 45%; border-left: none; border-top: 1px solid var(--border); }
+      .header-title h1 { font-size: 0.92rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Notificaciones Toast -->
+  <div id="toast-container"></div>
+
+  <header id="app-header">
+    <div class="header-title">
+      <h1>🌳 Inventario Florístico INEM Lorenzo María Lleras</h1>
+      <p>SIG Escolar • Vectores de Posición • PRAE Montería</p>
+    </div>
+    
+    <div class="header-actions">
+      <!-- Indicador de nube Supabase -->
+      <div class="cloud-status" id="cloud-status-badge" title="Estado de la base de datos">
+        <span class="cloud-dot" id="cloud-dot"></span>
+        <span id="cloud-status-text">Local</span>
+      </div>
+
+      <!-- Estadísticas (Público) -->
+      <button class="btn-header" id="btn-open-stats" title="Ver análisis fitosanitario y conteo de especies">
+        📊 Estadísticas
+      </button>
+
+      <!-- Medir Vector A -> B (Público / Educativo) -->
+      <button class="btn-header" id="btn-measure-vector" title="Medir vector relativo y distancia entre 2 árboles">
+        📐 Medir Vector (A → B)
+      </button>
+
+      <!-- Exportar Excel / XLSX (EXCLUSIVO ADMINISTRADOR) -->
+      <button class="btn-header admin-only-element" id="btn-export-excel" title="Exportar inventario con vectores y taxonomía a Excel nativo (.xlsx)">
+        📊 Descargar Excel (.xlsx)
+      </button>
+
+      <!-- Imprimir Fichas / Placas QR Masivas (EXCLUSIVO ADMINISTRADOR) -->
+      <button class="btn-header admin-only-element" id="btn-open-print-qr" title="Generar placas QR para imprimir y colgar en árboles">
+        🏷️ Placas QR Masivas
+      </button>
+
+      <!-- Pantalla Completa (Público) -->
+      <button class="btn-header" id="btn-toggle-fullscreen" title="Activar / Desactivar pantalla completa">
+        ⛶ Pantalla Completa
+      </button>
+
+      <!-- Candado Admin / Ajustes / Supabase -->
+      <button class="btn-header" id="btn-admin-access" title="Panel de gestión, subida de fotos y configuración Supabase">
+        🔒 Admin
+      </button>
+
+      <div class="stats-badge" id="stats-badge">80 Árboles</div>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div id="map"></div>
+
+    <!-- Tarjeta flotante de cálculo vectorial A -> B -->
+    <div class="floating-vector-math-card" id="floating-vector-card">
+      <h4>
+        <span>📐 Vector Relativo (<span id="vec-node-a-title">A</span> → <span id="vec-node-b-title">B</span>)</span>
+        <button class="modal-close-btn" style="width:20px;height:20px;font-size:12px;" onclick="closeMeasurementMode()">✕</button>
+      </h4>
+      <div id="floating-vector-body"></div>
+      <div style="margin-top: 8px; display: flex; gap: 6px;">
+        <button class="origin-btn" style="background:#2563eb;" onclick="invertMeasurementNodes()">⇄ Invertir (B → A)</button>
+        <button class="origin-btn" style="background:#64748b;" onclick="closeMeasurementMode()">Limpiar</button>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="sidebar-controls">
+        <input type="text" id="search-input" class="search-input" placeholder="🔍 Buscar por nombre, especie, familia o #ID...">
+        
+        <select id="zone-filter" class="filter-select">
+          <option value="ALL">Todas las zonas (A, B, C, D)</option>
+          <option value="Zona A">Zona A</option>
+          <option value="Zona B">Zona B</option>
+          <option value="Zona C">Zona C</option>
+          <option value="Zona D">Zona D</option>
+        </select>
+
+        <div class="toggles-row">
+          <label>
+            <input type="checkbox" id="chk-show-zones" checked> Sombrear polígonos
+          </label>
+          <label>
+            <input type="checkbox" id="chk-show-labels" checked> Nombres de Zona
+          </label>
+          <button class="origin-btn admin-only-element" id="btn-add-tree-shortcut" style="padding:2px 6px; font-size:0.68rem; background:#16a34a;" onclick="openAddTreeModal()">
+            ➕ Nuevo Árbol
+          </button>
+        </div>
+        
+        <!-- Panel del Origen (0,0) -->
+        <div class="vector-panel">
+          <h3>
+            <span>📐 Origen Vectorial (0, 0)</span>
+            <button class="origin-btn admin-only-element" id="btn-change-origin" title="Haz clic en cualquier punto del mapa para reubicar el origen">Mover Origen</button>
+          </h3>
+          <div id="origin-info" style="font-size: 0.72rem; color: #475569; margin-top: 3px;">
+            Punto: <span id="origin-name-txt" style="font-weight: 600;">Entrada Principal INEM</span><br>
+            Coord: <span id="origin-coords" style="font-family: monospace; font-weight: 600;">8.792169, -75.855913</span>
+          </div>
+        </div>
+
+        <!-- Guía de medición de vectores entre 2 árboles -->
+        <div class="measure-guide-box" id="measure-guide-box">
+          <div style="font-weight: 700; color: #1e40af; margin-bottom: 2px;">📏 Modo Medición de Vector (A → B)</div>
+          <div id="measure-step-text" style="color: #2563eb; line-height: 1.35;">Paso 1: Haz clic en el <b>Árbol A</b> (Punto inicial).</div>
+        </div>
+      </div>
+
+      <div class="tree-list" id="tree-list"></div>
+
+      <!-- Pie de créditos y autoría institucional discreto -->
+      <div class="sidebar-footer-credits">
+        <div><strong>© Copyright</strong></div>
+        <div><b>Autores:</b> Carmen Cantero Espitia • Leonardo Tirado • Liz Jiménez Tordecilla</div>
+        <div><b>Colaborador:</b> Arnulfo Estrada Martinez</div>
+        <div style="font-size:0.62rem; color:#94a3b8; margin-top:2px;">PRAE • INEM Lorenzo María Lleras (Montería)</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- MODAL 1: ESTADÍSTICAS Y DIAGNÓSTICO FITOSANITARIO -->
+  <div class="modal-overlay" id="modal-stats" onclick="handleOverlayClick(event, 'modal-stats')">
+    <div class="modal-card">
+      <h3>
+        <span>📊 Diagnóstico Fitosanitario y Métricas del Inventario</span>
+        <button class="modal-close-btn" onclick="closeModal('modal-stats')">✕</button>
+      </h3>
+
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="val" id="kpi-total">80</div>
+          <div class="lbl">Especímenes Registrados</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" id="kpi-species">24</div>
+          <div class="lbl">Especies Botánicas</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" id="kpi-risk" style="color: #dc2626;">12</div>
+          <div class="lbl">Árboles en Riesgo (Comején/Hongos)</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" id="kpi-top-zone" style="color: #2563eb;">Zona C</div>
+          <div class="lbl">Mayor Diversidad / Densidad</div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN: DISTRIBUCIÓN POR ZONA Y BIOMETRÍA -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px;">
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+            <h4 style="font-size: 0.85rem; color: #1e293b;">📍 Distribución por Zona del Campus</h4>
+            <span style="font-size: 0.7rem; color: #64748b;">(Clic para filtrar mapa)</span>
+          </div>
+          <div id="zone-stats-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+          <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">📐 Estructura Biométrica (Porte)</h4>
+          <div id="biometric-stats-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+      </div>
+
+      <div class="semaforo-container">
+        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">
+          🚦 Semáforo de Salud Fitosanitaria (Haz clic en una barra para ver especímenes)
+        </h4>
+
+        <!-- Barra Roja -->
+        <div class="semaforo-bar-item" onclick="toggleSemaforoList('list-rojo')">
+          <div class="bar-info">
+            <span style="color: #dc2626;">🔴 En Riesgo Fitosanitario (Comején, Hongos, Cañamulo, Deterioro)</span>
+            <span id="txt-count-rojo">0 árboles (0%)</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" id="bar-fill-rojo" style="background: #dc2626; width: 0%;"></div>
+          </div>
+          <div class="tree-sublist-drawer" id="list-rojo"></div>
+        </div>
+
+        <!-- Barra Amarilla -->
+        <div class="semaforo-bar-item" onclick="toggleSemaforoList('list-amarillo')">
+          <div class="bar-info">
+            <span style="color: #d97706;">🟡 Estado Regular / En Observación (Hojas secas, manchas)</span>
+            <span id="txt-count-amarillo">0 árboles (0%)</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" id="bar-fill-amarillo" style="background: #f59e0b; width: 0%;"></div>
+          </div>
+          <div class="tree-sublist-drawer" id="list-amarillo"></div>
+        </div>
+
+        <!-- Barra Verde -->
+        <div class="semaforo-bar-item" onclick="toggleSemaforoList('list-verde')">
+          <div class="bar-info">
+            <span style="color: #16a34a;">🟢 Estado Aparentemente Sano / Vigoroso</span>
+            <span id="txt-count-verde">0 árboles (0%)</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" id="bar-fill-verde" style="background: #16a34a; width: 0%;"></div>
+          </div>
+          <div class="tree-sublist-drawer" id="list-verde"></div>
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+        <h4 style="font-size: 0.85rem; margin-bottom: 8px; color: #1e293b;">🌿 Especies más Frecuentes en el Campus</h4>
+        <div id="species-ranking-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: IMPRESIÓN DE PLACAS QR MASIVAS (GESTIÓN EXCLUSIVA ADMINISTRADOR) -->
+  <div class="modal-overlay" id="modal-print-qr" onclick="handleOverlayClick(event, 'modal-print-qr')">
+    <div class="modal-card">
+      <div class="no-print">
+        <h3>
+          <span>🏷️ Generador Masivo de Placas Botánicas con QR para el Campus</span>
+          <button class="modal-close-btn" onclick="closeModal('modal-print-qr')">✕</button>
+        </h3>
+        <p style="font-size: 0.77rem; color: #64748b; margin-bottom: 12px;">
+          Imprime el pliego de tarjetas para plastificar y colocar físicamente en los troncos de los árboles en el colegio. Al escanear el QR físico con un teléfono móvil, el visitante abrirá automáticamente la ficha satelital interactiva de ese árbol en el mapa.
+        </p>
+
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
+          <select id="print-zone-filter" class="filter-select" style="max-width: 220px;" onchange="renderPlacasPrint()">
+            <option value="ALL">Todas las zonas (80 árboles)</option>
+            <option value="Zona A">Zona A</option>
+            <option value="Zona B">Zona B</option>
+            <option value="Zona C">Zona C</option>
+            <option value="Zona D">Zona D</option>
+          </select>
+          <button class="btn-save-admin" onclick="window.print()">
+            🖨️ Imprimir Pliego Completo (o Guardar PDF)
+          </button>
+        </div>
+      </div>
+
+      <div class="print-grid" id="print-placas-grid"></div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: AUTENTICACIÓN ADMIN -->
+  <div class="modal-overlay" id="modal-admin-auth" onclick="handleOverlayClick(event, 'modal-admin-auth')">
+    <div class="modal-card" style="max-width: 380px;">
+      <h3>
+        <span>🔒 Acceso Administrador</span>
+        <button class="modal-close-btn" onclick="closeModal('modal-admin-auth')">✕</button>
+      </h3>
+      <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 12px;">
+        Ingresa la contraseña institucional para exportar reportes Excel, generar placas QR, registrar árboles y gestionar la base de datos.
+      </p>
+
+      <form onsubmit="event.preventDefault(); verifyAdminPassword();">
+        <div class="admin-form-group">
+          <label>Contraseña:</label>
+          <input type="password" id="admin-pass-input" class="admin-input" placeholder="Ingresa la clave..." autocomplete="current-password">
+          <div id="auth-error-msg" style="color: #dc2626; font-size: 0.72rem; margin-top: 4px; display: none;">Contraseña incorrecta. Inténtalo de nuevo.</div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="origin-btn" style="background:#64748b;" onclick="closeModal('modal-admin-auth')">Cancelar</button>
+          <button type="submit" class="btn-save-admin">Ingresar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: PANEL ADMIN COMPLETO -->
+  <div class="modal-overlay" id="modal-settings" onclick="handleOverlayClick(event, 'modal-settings')">
+    <div class="modal-card">
+      <h3>
+        <span>⚙️ Panel de Gestión Institucional & Base de Datos</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="origin-btn" style="background:#0284c7;" onclick="switchAdminTab('tab-seguridad')">🔑 Cambiar Clave</button>
+          <button class="origin-btn" style="background:#dc2626;" onclick="lockAdminSession()">🔒 Salir / Bloquear</button>
+          <button class="modal-close-btn" onclick="closeModal('modal-settings')">✕</button>
+        </div>
+      </h3>
+
+      <div class="admin-tabs">
+        <button class="admin-tab-btn active" id="btn-tab-arbol" onclick="switchAdminTab('tab-arbol')">🌳 Registrar / Editar Árbol</button>
+        <button class="admin-tab-btn" id="btn-tab-single-qr" onclick="switchAdminTab('tab-single-qr')">🏷️ Placas QR & Rotulado</button>
+        <button class="admin-tab-btn" id="btn-tab-export" onclick="switchAdminTab('tab-export')">📊 Exportaciones & Fichas</button>
+        <button class="admin-tab-btn" id="btn-tab-supabase" onclick="switchAdminTab('tab-supabase')">⚡ Conexión Supabase</button>
+        <button class="admin-tab-btn" id="btn-tab-seguridad" onclick="switchAdminTab('tab-seguridad')">🔐 Seguridad & Clave</button>
+      </div>
+
+      <!-- PESTAÑA 1: FORMULARIO DE ÁRBOLES Y FOTOS -->
+      <div class="tab-content active" id="tab-arbol">
+        <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 12px;">
+          Agrega nuevos especímenes o selecciona uno existente para editar su información, taxonomía botánica, servicios ecosistémicos, fotos o biometría.
+        </p>
+
+        <!-- BARRA DE SELECCIÓN RÁPIDA DE ÁRBOL A EDITAR -->
+        <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:8px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div style="font-size:0.79rem; font-weight:700; color:#166534; display:flex; align-items:center; gap:6px;">
+            <span>✏️ Seleccionar árbol para cargar y editar:</span>
+          </div>
+          <div style="display:flex; gap:8px; flex:1; max-width:380px;">
+            <select id="quick-select-edit-tree" class="admin-select" style="font-size:0.77rem; padding:6px 10px; font-weight:600; border-color:#86efac;" onchange="handleQuickSelectTree(this.value)">
+              <option value="">-- Elige un árbol de la lista --</option>
+            </select>
+            <button type="button" class="origin-btn" style="background:#059669; white-space:nowrap; padding:5px 10px; font-size:0.74rem;" onclick="resetTreeForm()">➕ Modo Nuevo</button>
+          </div>
+        </div>
+
+        <form id="form-manage-tree" onsubmit="event.preventDefault(); handleSaveTree();">
+          <input type="hidden" id="tree-form-db-id">
+
+          <!-- BANNER DINÁMICO DE MODO EDICIÓN -->
+          <div id="tree-form-mode-banner" style="display:none; background:#dbeafe; color:#1e40af; border:1.5px solid #93c5fd; border-radius:8px; padding:8px 12px; font-size:0.78rem; font-weight:700; margin-bottom:14px; justify-content:space-between; align-items:center;">
+            <span id="tree-form-mode-text">Modo Edición: Árbol #0</span>
+            <button type="button" class="origin-btn" style="background:#2563eb; font-size:0.7rem; padding:3px 8px;" onclick="resetTreeForm()">✕ Cancelar y Volver a Modo Nuevo</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+            <div class="admin-form-group">
+              <label># ID del Árbol:</label>
+              <input type="number" id="tree-form-number" class="admin-input" required min="1" placeholder="Ej. 81" onchange="handleIdInputChange(this.value)">
+              <small style="font-size:0.67rem; color:#64748b;">Si escribes el número de un árbol existente, cargará sus datos automáticamente.</small>
+            </div>
+
+            <div class="admin-form-group">
+              <label>Zona del Campus:</label>
+              <select id="tree-form-zone" class="admin-select" required>
+                <option value="Zona A">Zona A</option>
+                <option value="Zona B">Zona B</option>
+                <option value="Zona C">Zona C</option>
+                <option value="Zona D">Zona D</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+            <div class="admin-form-group">
+              <label>Nombre Común:</label>
+              <input type="text" id="tree-form-common" class="admin-input" required placeholder="Ej. Roble morado, Mango, Totumo..." oninput="autoFillBotanicalSuggestions(false)">
+            </div>
+
+            <div class="admin-form-group">
+              <label>Nombre Científico:</label>
+              <input type="text" id="tree-form-scientific" class="admin-input" placeholder="Ej. Tabebuia rosea" oninput="autoFillBotanicalSuggestions(false)">
+            </div>
+          </div>
+
+          <!-- BLOQUE DE TAXONOMÍA Y ECOLOGÍA EDITABLE -->
+          <div style="background: #fdfbf7; border: 1.5px solid #fed7aa; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size:0.79rem; font-weight:700; color:#9a3412; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+              <span>🌿 Taxonomía Botánica y Servicios Ecosistémicos (PRAE):</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+              <div class="admin-form-group" style="margin-bottom:8px;">
+                <label>1. Familia Botánica:</label>
+                <input type="text" id="tree-form-family" class="admin-input" placeholder="Ej. Fabaceae, Anacardiaceae, Arecaceae...">
+              </div>
+
+              <div class="admin-form-group" style="margin-bottom:8px;">
+                <label>2. Origen Biogeográfico:</label>
+                <select id="tree-form-origin" class="admin-select">
+                  <option value="Nativa del Caribe">🌿 Nativa del Caribe / Neotropical</option>
+                  <option value="Introducida">🌍 Introducida / Exótica</option>
+                  <option value="Por determinar">🌱 Por determinar / Local</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="admin-form-group" style="margin-bottom:0;">
+              <label>3. Servicios Ecosistémicos Clave (Separados por coma):</label>
+              <input type="text" id="tree-form-services" class="admin-input" placeholder="Ej. Confort térmico / Sombra, Fruto comestible / Fauna, Polinizadores...">
+              <small style="font-size:0.67rem; color:#78350f;">Se mostrarán como micro-insignias en la tarjeta y en la exportación de Excel.</small>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+            <div class="admin-form-group">
+              <label>Clasificación Biométrica (Porte):</label>
+              <select id="tree-form-biometric" class="admin-select">
+                <option value="Fustal">Fustal (Árbol maduro / fuste grueso)</option>
+                <option value="Latizal">Latizal (Árbol mediano en desarrollo)</option>
+                <option value="Brinzal">Brinzal (Plántula o juvenil)</option>
+                <option value="No aplica">No aplica (Palma, ornamental, arbusto)</option>
+              </select>
+            </div>
+
+            <div class="admin-form-group">
+              <label>Fotografía del Árbol (Cámara o Galería):</label>
+              <input type="file" id="tree-form-file" class="admin-input" accept="image/*" capture="environment">
+              <input type="hidden" id="tree-form-existing-photo">
+              <div id="tree-form-photo-indicator" style="font-size:0.69rem; color:#15803d; margin-top:3px; display:none; font-weight:600;">
+                📷 Este espécimen ya tiene una foto asignada. Sube un archivo nuevo solo si deseas reemplazarla.
+              </div>
+            </div>
+          </div>
+
+          <div class="admin-form-group">
+            <label>Estado Fitosanitario y Observaciones en Campo:</label>
+            <textarea id="tree-form-observations" class="admin-textarea" placeholder="Describe si presenta comején, hongos, cañamulo, frondas secas, flores, frutos o si se encuentra vigoroso..."></textarea>
+          </div>
+
+          <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-weight: 700; font-size: 0.77rem; color: #1e293b;">📍 Coordenadas GPS del Espécimen:</span>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="origin-btn" style="background:#2563eb;" onclick="captureGpsLocation()">
+                  📱 Capturar mi GPS
+                </button>
+                <button type="button" class="origin-btn" style="background:#475569;" onclick="startPickLocationOnMap()">
+                  🗺️ Marcar en Mapa
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div>
+                <label style="font-size: 0.7rem; color:#64748b;">Latitud:</label>
+                <input type="number" step="any" id="tree-form-lat" class="admin-input" required placeholder="8.792xxx">
+              </div>
+              <div>
+                <label style="font-size: 0.7rem; color:#64748b;">Longitud:</label>
+                <input type="number" step="any" id="tree-form-lng" class="admin-input" required placeholder="-75.856xxx">
+              </div>
+            </div>
+          </div>
+
+          <div id="tree-save-status" style="font-size: 0.76rem; font-weight: 600; margin-bottom: 8px; display: none;"></div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="origin-btn" style="background:#64748b;" onclick="resetTreeForm()">Limpiar Formulario</button>
+            <button type="submit" class="btn-save-admin" id="btn-save-tree-record">
+              💾 Guardar Espécimen
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- PESTAÑA 2: ESTACIÓN DE ROTULADO INDIVIDUAL & PLACAS QR -->
+      <div class="tab-content" id="tab-single-qr">
+        <div class="single-placa-station">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h4 style="font-size: 0.88rem; color: #1e293b; font-weight: 700;">🏷️ Estación de Rotulado Botánico Individual</h4>
+              <p style="font-size: 0.73rem; color: #64748b;">
+                Selecciona cualquier árbol existente o recién agregado para generar, previsualizar y descargar su placa botánica física.
+              </p>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="origin-btn" style="background:#0284c7;" onclick="renderSinglePlacaStation()">🔄 Refrescar</button>
+            </div>
+          </div>
+
+          <div class="admin-form-group" style="margin-bottom: 12px;">
+            <label style="color:#0f172a; font-weight:700;">1. Selecciona el Árbol a Rotular:</label>
+            <select id="single-placa-tree-select" class="admin-select" style="font-size:0.83rem; font-weight:600; padding:8px 10px; border-color:#93c5fd;" onchange="updateSinglePlacaPreview(this.value)">
+              <!-- Llenado dinámico -->
+            </select>
+          </div>
+
+          <!-- CONTENEDOR DE PREVISUALIZACIÓN DE LA PLACA FÍSICA -->
+          <div style="background: #e2e8f0; padding: 16px; border-radius: 10px; text-align: center;">
+            <div style="font-size:0.71rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+              Previsualización de la Tarjeta Física (Lista para Plastificar y Colgar):
+            </div>
+
+            <div class="single-placa-preview-box" id="single-placa-preview-target">
+              <!-- Renderizado dinámico -->
+            </div>
+
+            <!-- BOTONES DE ACCIÓN PARA LA PLACA INDIVIDUAL -->
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+              <button type="button" class="btn-save-admin" style="background:#16a34a;" id="btn-download-single-png" onclick="downloadSinglePlacaImage()">
+                📥 Descargar Placa en Imagen (PNG)
+              </button>
+              <button type="button" class="btn-save-admin" style="background:#2563eb;" onclick="printSinglePlacaDirect()">
+                🖨️ Imprimir Esta Placa
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACORDEÓN PLEGADO PARA AJUSTES TÉCNICOS DE ENLACE QR (OPCIONAL) -->
+        <details style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px;">
+          <summary style="font-size: 0.77rem; font-weight: 700; color: #475569; cursor: pointer;">
+            ⚙️ Configuración Avanzada del Enlace QR (Opcional si cambias de dominio web)
+          </summary>
+          <div style="margin-top: 10px; font-size: 0.74rem;">
+            <div class="admin-form-group">
+              <label>Nombre Institucional en la Placa:</label>
+              <input type="text" id="setting-school-name" class="admin-input" value="INEM Lorenzo María Lleras • PRAE">
+            </div>
+            <div class="admin-form-group">
+              <label>URL Base del Aplicativo Alojado:</label>
+              <input type="text" id="setting-web-base-url" class="admin-input" placeholder="https://tu-usuario.github.io/inem-flora/">
+              <small style="font-size:0.68rem; color:#64748b;">El código QR físico dirigirá a los visitantes a: <code>[URL_BASE]#tree-[ID]</code></small>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+              <button type="button" class="btn-save-admin" style="padding:4px 10px; font-size:0.74rem;" onclick="saveGeneralSettings()">Guardar Enlace Base</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- PESTAÑA 3: EXPORTACIONES Y FICHAS (EXCLUSIVA DE ADMIN) -->
+      <div class="tab-content" id="tab-export">
+        <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 14px;">
+          Herramientas administrativas para descargar la base de datos de campo enriquecida y generar las tarjetas impresas para el campus.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 16px;">
+          <!-- Opción Excel -->
+          <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="font-size: 1.3rem;">📊</span>
+                <strong style="font-size: 0.88rem; color: #0f172a;">Inventario en Excel (.xlsx)</strong>
+              </div>
+              <p style="font-size: 0.73rem; color: #64748b; line-height: 1.4; margin-bottom: 10px;">
+                Descarga la matriz forestal completa con vectores (&Delta;x, &Delta;y), distancias, azimut, biometría, <b>familia botánica, origen biogeográfico y servicios ecosistémicos</b>.
+              </p>
+            </div>
+            <button type="button" class="btn-save-admin" style="background: #15803d; width: 100%; justify-content: center;" onclick="exportToExcelCSV()">
+              📥 Descargar Archivo Excel (.xlsx)
+            </button>
+          </div>
+
+          <!-- Opción Placas QR Masivas -->
+          <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="font-size: 1.3rem;">🏷️</span>
+                <strong style="font-size: 0.88rem; color: #0f172a;">Placas Botánicas Masivas con QR</strong>
+              </div>
+              <p style="font-size: 0.73rem; color: #64748b; line-height: 1.4; margin-bottom: 10px;">
+                Genera el pliego completo de las 80 placas botánicas filtradas por zona para imprimir en una sola tanda y rotular físicamente los árboles del colegio.
+              </p>
+            </div>
+            <button type="button" class="btn-save-admin" style="background: #0284c7; width: 100%; justify-content: center;" onclick="closeModal('modal-settings'); openPrintModal();">
+              🖨️ Abrir Pliego Masivo de Placas
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PESTAÑA 4: CONEXIÓN SUPABASE -->
+      <div class="tab-content" id="tab-supabase">
+        <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 12px;">
+          Configura las credenciales de tu proyecto Supabase para sincronizar automáticamente el mapa y almacenar fotos en la nube.
+        </p>
+
+        <div class="admin-form-group">
+          <label>1. Supabase Project URL:</label>
+          <input type="text" id="setting-sb-url" class="admin-input" placeholder="https://tu-proyecto.supabase.co">
+        </div>
+
+        <div class="admin-form-group">
+          <label>2. Supabase Anon Public Key:</label>
+          <input type="password" id="setting-sb-key" class="admin-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+
+        <div class="admin-form-group">
+          <label>3. Nombre del Storage Bucket de Fotos:</label>
+          <input type="text" id="setting-sb-bucket" class="admin-input" value="fotos-arboles" placeholder="fotos-arboles">
+        </div>
+
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px; font-size: 0.74rem; color: #1e40af; margin-bottom: 14px;">
+          💡 <b>Instrucción rápida:</b> Si aún no tienes Supabase configurado, la aplicación funciona de forma transparente con la base local de los 80 árboles precargados. Al ingresar tus llaves, comenzará a leer y escribir directamente en la nube.
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-save-admin" onclick="testAndSaveSupabaseConfig()">
+            ⚡ Probar y Conectar Supabase
+          </button>
+        </div>
+      </div>
+
+      <!-- PESTAÑA 5: SEGURIDAD Y GESTOR DE CLAVE ADMIN -->
+      <div class="tab-content" id="tab-seguridad">
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+          <h4 style="font-size: 0.85rem; color: #166534; margin-bottom: 4px; display:flex; align-items:center; gap:6px;">
+            🛡️ Gestión de Clave de Administrador
+          </h4>
+          <p style="font-size: 0.74rem; color: #15803d; line-height: 1.4;">
+            Esta clave protege la creación de nuevos árboles, la exportación a Excel, la generación de placas QR y la edición de ajustes. Solo quienes la conozcan podrán acceder a estas herramientas.
+          </p>
+        </div>
+
+        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+            <span style="font-size:0.78rem; font-weight:700; color:#334155;">Estado de la Clave:</span>
+            <span id="badge-key-status" style="background:#dcfce7; color:#166534; font-size:0.7rem; font-weight:700; padding:3px 8px; border-radius:12px;">Activa y Protegida</span>
+          </div>
+
+          <div class="admin-form-group">
+            <label>Nueva Contraseña de Administrador:</label>
+            <div style="position: relative;">
+              <input type="password" id="input-new-pass" class="admin-input" placeholder="Mínimo 4 caracteres..." style="padding-right: 36px;">
+              <button type="button" onclick="togglePassVisibility('input-new-pass', 'btn-eye-1')" id="btn-eye-1" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:0.85rem; color:#64748b;" title="Ver/Ocultar">👁️</button>
+            </div>
+          </div>
+
+          <div class="admin-form-group">
+            <label>Confirmar Nueva Contraseña:</label>
+            <div style="position: relative;">
+              <input type="password" id="input-confirm-pass" class="admin-input" placeholder="Repite la contraseña..." style="padding-right: 36px;">
+              <button type="button" onclick="togglePassVisibility('input-confirm-pass', 'btn-eye-2')" id="btn-eye-2" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:0.85rem; color:#64748b;" title="Ver/Ocultar">👁️</button>
+            </div>
+          </div>
+
+          <div id="pass-change-msg" style="font-size: 0.74rem; font-weight: 600; margin-bottom: 10px; display: none;"></div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="origin-btn" style="background:#dc2626;" onclick="restoreDefaultAdminPassPrompt()">
+              🔄 Restaurar a 'inem2026'
+            </button>
+            <button type="button" class="btn-save-admin" onclick="updateAdminPassword()">
+              💾 Guardar Nueva Clave
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: DIÁLOGO DE CONFIRMACIÓN REUTILIZABLE -->
+  <div class="modal-overlay" id="modal-confirm-dialog" onclick="handleOverlayClick(event, 'modal-confirm-dialog')">
+    <div class="modal-card" style="max-width: 390px; text-align: center;">
+      <h3 style="justify-content: center; border: none; padding-bottom: 0;">
+        <span id="confirm-dialog-title">Confirmación</span>
+      </h3>
+      <p id="confirm-dialog-message" style="font-size: 0.8rem; color: #475569; margin: 12px 0 18px 0; line-height: 1.45;"></p>
+      <div style="display: flex; justify-content: center; gap: 10px;">
+        <button class="origin-btn" style="background:#64748b; padding: 6px 14px;" id="btn-confirm-cancel">Cancelar</button>
+        <button class="btn-save-admin" style="background:#dc2626; padding: 6px 14px;" id="btn-confirm-accept">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    /* DICCIONARIO BOTÁNICO TAXONÓMICO Y ECOLÓGICO INSTITUCIONAL DEL INEM */
+    const BOTANICAL_CATALOG = {
+      "mangifera indica": {
+        family: "Anacardiaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Confort térmico / Sombra", "Fruto comestible / Fauna"]
+      },
+      "azadirachta indica": {
+        family: "Meliaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Insecticida natural", "Confort térmico / Sombra"]
+      },
+      "roystonea regia": {
+        family: "Arecaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Alimento para avifauna", "Valor paisajístico"]
+      },
+      "arecaceae": {
+        family: "Arecaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Refugio avifauna", "Microclima"]
+      },
+      "citrus aurantifolia": {
+        family: "Rutaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Fruto cítrico", "Polinizadores"]
+      },
+      "quercus robur": {
+        family: "Fagaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Captura de carbono", "Follaje denso"]
+      },
+      "ixora coccinea": {
+        family: "Rubiaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Melífera / Mariposas", "Jardinería PRAE"]
+      },
+      "allamanda cathartica": {
+        family: "Apocynaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Polinizadores", "Control de erosión"]
+      },
+      "dypsis lutescens": {
+        family: "Arecaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Filtro de aire", "Regulación microclimática"]
+      },
+      "syzygium malaccense": {
+        family: "Myrtaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Fruto comestible / Aves", "Sombra fresca"]
+      },
+      "palma washingtonia": {
+        family: "Arecaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Nidificación de aves", "Resistencia a sequía"]
+      },
+      "almendro tropical": {
+        family: "Combretaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Sombra densa / Vigor", "Fruto para fauna"]
+      },
+      "persea americana": {
+        family: "Lauraceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Fruto nutritivo", "Atracción de polinizadores"]
+      },
+      "brownea stenantha": {
+        family: "Fabaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Polinización por colibríes", "Fijación biológica de nitrógeno"]
+      },
+      "psidium guajava": {
+        family: "Myrtaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Fruta para avifauna", "Uso medicinal tradicional"]
+      },
+      "laurus nobilis": {
+        family: "Lauraceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Aroma / Aceites esenciales", "Follaje perenne"]
+      },
+      "spondias mombin": {
+        family: "Anacardiaceae",
+        origin: "Nativa del Caribe",
+        native: true,
+        services: ["Fruto silvestre / Fauna", "Conservación de suelo"]
+      },
+      "prunus dulcis": {
+        family: "Combretaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Sombra amplia", "Biomasa foliar"]
+      },
+      "delonix regia": {
+        family: "Fabaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Floración melífera", "Sombra amplia en sombrilla"]
+      },
+      "syzygium cumini": {
+        family: "Myrtaceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Fruto para aves", "Confort térmico"]
+      },
+      "lagerstroemia speciosa": {
+        family: "Lythraceae",
+        origin: "Introducida",
+        native: false,
+        services: ["Floración llamativa", "Atracción de abejas"]
+      }
+    };
+
+    function getBotanicalInfo(scientificName, commonName, treeObj = null) {
+      if (treeObj) {
+        const customFamily = treeObj["Familia Botánica"] || treeObj.familia_botanica;
+        const customOrigin = treeObj["Origen Biogeográfico"] || treeObj.origen_biogeografico;
+        let customServices = treeObj["Servicios Ecosistémicos"] || treeObj.servicios_ecosistemicos;
+
+        if (customFamily || customOrigin || customServices) {
+          if (typeof customServices === 'string') {
+            customServices = customServices.split(',').map(s => s.trim()).filter(Boolean);
+          }
+          const isNat = (customOrigin || '').toLowerCase().includes('nativ');
+          const isExo = (customOrigin || '').toLowerCase().includes('introducid');
+          return {
+            family: customFamily || 'Por determinar',
+            origin: customOrigin || 'Flora local escolar',
+            native: isNat ? true : (isExo ? false : null),
+            services: (Array.isArray(customServices) && customServices.length > 0) ? customServices : ["Cobertura vegetal urbana", "Confort ambiental"]
+          };
+        }
+      }
+
+      const scClean = (scientificName || '').toLowerCase().trim();
+      const cmClean = (commonName || '').toLowerCase().trim();
+
+      for (const [key, data] of Object.entries(BOTANICAL_CATALOG)) {
+        if (scClean.includes(key) || key.includes(scClean)) {
+          return data;
+        }
+      }
+
+      if (cmClean.includes('mango')) return BOTANICAL_CATALOG["mangifera indica"];
+      if (cmClean.includes('neem')) return BOTANICAL_CATALOG["azadirachta indica"];
+      if (cmClean.includes('palma real')) return BOTANICAL_CATALOG["roystonea regia"];
+      if (cmClean.includes('areca')) return BOTANICAL_CATALOG["dypsis lutescens"];
+      if (cmClean.includes('ixora')) return BOTANICAL_CATALOG["ixora coccinea"];
+      if (cmClean.includes('florisanto')) return BOTANICAL_CATALOG["brownea stenantha"];
+      if (cmClean.includes('almendro')) return BOTANICAL_CATALOG["almendro tropical"];
+      if (cmClean.includes('acacia')) return BOTANICAL_CATALOG["delonix regia"];
+      if (cmClean.includes('jobo')) return BOTANICAL_CATALOG["spondias mombin"];
+      if (cmClean.includes('guayabo')) return BOTANICAL_CATALOG["psidium guajava"];
+      if (cmClean.includes('aguacate')) return BOTANICAL_CATALOG["persea americana"];
+      if (cmClean.includes('pera')) return BOTANICAL_CATALOG["syzygium malaccense"];
+      if (cmClean.includes('limon') || cmClean.includes('limón')) return BOTANICAL_CATALOG["citrus aurantifolia"];
+      if (cmClean.includes('jambol')) return BOTANICAL_CATALOG["syzygium cumini"];
+
+      return {
+        family: "Por determinar",
+        origin: "Flora local escolar",
+        native: null,
+        services: ["Cobertura vegetal urbana", "Confort ambiental"]
+      };
+    }
+
+    const initialTreeData = [
+      {"ID": 1, "Zona": "Zona A", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Follaje abundante y denso; tronco grueso, robusto y muy ramificado. Presenta algunas flores. No se observan signos evidentes de patógenos y se encuentra aparentemente sano.", "Longitud": -75.856855, "Latitud": 8.792233, "Enlace foto": ""},
+      {"ID": 2, "Zona": "Zona A", "Nombre comun": "Neem", "Nombre científico": "Azadirachta indica A. Juss", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Follaje abundante y verde; tronco delgado, ramificado desde baja altura y con varias ramas principales. No se observan flores ni frutos. No presenta signos evidentes de patógenos y se encuentra aparentemente en buen estado", "Longitud": -75.8582974, "Latitud": 8.788487, "Enlace foto": ""},
+      {"ID": 3, "Zona": "Zona A", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Tronco grueso y robusto, con follaje escaso concentrado en la copa y seis frondas visibles. No se observan flores ni frutos. Presenta manchas superficiales en el tronco, sin daños estructurales evidentes", "Longitud": -75.8564159, "Latitud": 8.792342, "Enlace foto": ""},
+      {"ID": 4, "Zona": "Zona A", "Nombre comun": "Palmera", "Nombre científico": "Arecaceae", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Fuste grueso, recto y robusto, con manchas superficiales en la corteza. No se observan daños estructurales evidentes y presenta buen estado general", "Longitud": -75.8564897, "Latitud": 8.79249393, "Enlace foto": ""},
+      {"ID": 5, "Zona": "Zona A", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco muy grueso y robusto, con abundantes ramificaciones y follaje. Presenta frutos grandes, ovalados, de superficie lisa con numerosos puntos blanquecinos. Se observa una abertura longitudinal en el tronco, sin signos evidentes de patógenos", "Longitud": -75.8564782, "Latitud": 8.79243278, "Enlace foto": ""},
+      {"ID": 6, "Zona": "Zona A", "Nombre comun": "Limón / Limonero", "Nombre científico": "Citrus aurantifolia", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco ramificado, follaje verde con algunas hojas amarillentas y presencia de frutos. Sin signos evidentes de patógenos", "Longitud": -75.8565415, "Latitud": 8.79235432, "Enlace foto": ""},
+      {"ID": 7, "Zona": "Zona A", "Nombre comun": "Roble", "Nombre científico": "Quercus robur", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Tronco alto y delgado, con pocas ramificaciones y follaje concentrado en la copa. No se observan flores ni frutos, ni signos evidentes de patógenos.", "Longitud": -75.8565426, "Latitud": 8.79233484, "Enlace foto": ""},
+      {"ID": 8, "Zona": "Zona A", "Nombre comun": "Palmera", "Nombre científico": "Arecaceae", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Árbol con estructura estable y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8567763, "Latitud": 8.7922506, "Enlace foto": ""},
+      {"ID": 9, "Zona": "Zona A", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Es muy alto, grande, tiene pocas ramas, y son muy largas", "Longitud": -75.8568375, "Latitud": 8.79227734, "Enlace foto": ""},
+      {"ID": 10, "Zona": "Zona A", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, de tronco grueso y muy ramificado, con follaje abundante. No se observan frutos ni signos evidentes de patógenos", "Longitud": -75.856935, "Latitud": 8.79249667, "Enlace foto": ""},
+      {"ID": 11, "Zona": "Zona A", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Fuste alto, grueso y recto, con superficie lisa y manchas superficiales. Follaje verde en la copa, sin signos evidentes de patógenos", "Longitud": -75.8568848, "Latitud": 8.79225705, "Enlace foto": ""},
+      {"ID": 12, "Zona": "Zona A", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Fuste alto, grueso y recto, con superficie lisa y manchas superficiales. Follaje verde en la copa, sin signos evidentes de patógenos", "Longitud": -75.8568289, "Latitud": 8.792284, "Enlace foto": ""},
+      {"ID": 13, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564345, "Latitud": 8.7918778, "Enlace foto": ""},
+      {"ID": 14, "Zona": "Zona B", "Nombre comun": "Ixora (Ornamental)", "Nombre científico": "Ixora coccinea L.", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Planta ornamental adulta, con manchas oscuras en el follaje y posible presencia de hongos; estado fitosanitario comprometido", "Longitud": -75.8566622, "Latitud": 8.79181822, "Enlace foto": ""},
+      {"ID": 15, "Zona": "Zona B", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, muy ramificado, con follaje abundante y presencia de hojas nuevas. Se encuentra aparentemente en buen estado, sin signos evidentes de patógenos", "Longitud": -75.856599, "Latitud": 8.7918551, "Enlace foto": ""},
+      {"ID": 16, "Zona": "Zona B", "Nombre comun": "Jazmín de Cuba", "Nombre científico": "Allamanda cathartica", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Planta ornamental muy ramificada, con follaje abundante y presencia de flores amarillas. Sin signos evidentes de patógenos", "Longitud": -75.8564601, "Latitud": 8.79158872, "Enlace foto": ""},
+      {"ID": 17, "Zona": "Zona B", "Nombre comun": "Palma areca", "Nombre científico": "Dypsis lutescens", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera de follaje moderado, con varias frondas secas y amarillentas; estado fitosanitario regular", "Longitud": -75.8562059, "Latitud": 8.79197454, "Enlace foto": ""},
+      {"ID": 18, "Zona": "Zona B", "Nombre comun": "Palma areca", "Nombre científico": "Dypsis lutescens", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera de follaje moderado, con varias frondas secas y amarillentas; estado fitosanitario regular", "Longitud": -75.8562874, "Latitud": 8.79194432, "Enlace foto": ""},
+      {"ID": 19, "Zona": "Zona B", "Nombre comun": "Ixora (Ornamental)", "Nombre científico": "Ixora coccinea L.", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Ornamental en buen estado", "Longitud": -75.856423, "Latitud": 8.79182589, "Enlace foto": ""},
+      {"ID": 20, "Zona": "Zona B", "Nombre comun": "Ixora (Ornamental)", "Nombre científico": "Ixora coccinea L.", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Ornamental en excelente estado y buen follaje.", "Longitud": -75.8564696, "Latitud": 8.79182916, "Enlace foto": ""},
+      {"ID": 21, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564869, "Latitud": 8.79180594, "Enlace foto": ""},
+      {"ID": 22, "Zona": "Zona B", "Nombre comun": "Pero de agua", "Nombre científico": "Syzygium malaccense", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, de tronco robusto y follaje abundante, aparentemente sano y sin signos evidentes de patógenos", "Longitud": -75.8566255, "Latitud": 8.79178947, "Enlace foto": ""},
+      {"ID": 23, "Zona": "Zona B", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Es un árbol que está en buen estado", "Longitud": -75.8566298, "Latitud": 8.79202039, "Enlace foto": ""},
+      {"ID": 24, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8565125, "Latitud": 8.79201725, "Enlace foto": ""},
+      {"ID": 25, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.85644, "Latitud": 8.79206708, "Enlace foto": ""},
+      {"ID": 26, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.85644, "Latitud": 8.79203472, "Enlace foto": ""},
+      {"ID": 27, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564859, "Latitud": 8.79203221, "Enlace foto": ""},
+      {"ID": 28, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564291, "Latitud": 8.7919196, "Enlace foto": ""},
+      {"ID": 29, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564465, "Latitud": 8.7918833, "Enlace foto": ""},
+      {"ID": 30, "Zona": "Zona B", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol en buen estado", "Longitud": -75.8559224, "Latitud": 8.79225043, "Enlace foto": ""},
+      {"ID": 31, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8564182, "Latitud": 8.79212944, "Enlace foto": ""},
+      {"ID": 32, "Zona": "Zona B", "Nombre comun": "Palma abanico", "Nombre científico": "Palma Washingtonia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera con abundantes hojas secas y presencia de frutos; estado fitosanitario aparentemente regular", "Longitud": -75.8564086, "Latitud": 8.79215383, "Enlace foto": ""},
+      {"ID": 33, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8565166, "Latitud": 8.79216083, "Enlace foto": ""},
+      {"ID": 34, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.856655, "Latitud": 8.7920289, "Enlace foto": ""},
+      {"ID": 35, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8566117, "Latitud": 8.79203333, "Enlace foto": ""},
+      {"ID": 36, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8568513, "Latitud": 8.7920553, "Enlace foto": ""},
+      {"ID": 37, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera con fuste robusto y deterioro visible en la base; estado fitosanitario comprometido", "Longitud": -75.8567917, "Latitud": 8.79208167, "Enlace foto": ""},
+      {"ID": 38, "Zona": "Zona B", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.85713, "Latitud": 8.79196662, "Enlace foto": ""},
+      {"ID": 39, "Zona": "Zona B", "Nombre comun": "Palma abanico", "Nombre científico": "Palma Washingtonia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera con alto riesgo fitosanitario", "Longitud": -75.8571245, "Latitud": 8.7917484, "Enlace foto": ""},
+      {"ID": 40, "Zona": "Zona C", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Follaje abundante y denso; tronco grueso, robusto y muy ramificado. Presenta algunas flores. No se observan signos evidentes de patógenos y se encuentra aparentemente sano, aunque presenta algunas hojas secas", "Longitud": -75.8563903, "Latitud": 8.7921215, "Enlace foto": ""},
+      {"ID": 41, "Zona": "Zona C", "Nombre comun": "Almendro", "Nombre científico": "Almendro tropical", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco robusto y muy ramificado, con follaje abundante y presencia aparente de hongos; estado fitosanitario comprometido", "Longitud": -75.8559137, "Latitud": 8.79202742, "Enlace foto": ""},
+      {"ID": 42, "Zona": "Zona C", "Nombre comun": "Neem", "Nombre científico": "Azadirachta indica A. Juss", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Tiene hojas secas y está en crecimiento", "Longitud": -75.8558466, "Latitud": 8.79208603, "Enlace foto": ""},
+      {"ID": 43, "Zona": "Zona C", "Nombre comun": "Aguacate", "Nombre científico": "Persea americana", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco robusto, hojas verdes", "Longitud": -75.8565636, "Latitud": 8.7917635, "Enlace foto": ""},
+      {"ID": 44, "Zona": "Zona C", "Nombre comun": "Palma Real", "Nombre científico": "Roystonea Regia", "Clasificación biométrica": "No aplica", "Estado fitosanitario/Observaciones": "Palmera adulta, con fuste robusto y follaje en buen estado, sin signos evidentes de patógenos", "Longitud": -75.8562317, "Latitud": 8.79161167, "Enlace foto": ""},
+      {"ID": 45, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Tiene hojas secas esta en crecimiento", "Longitud": -75.8560413, "Latitud": 8.79187648, "Enlace foto": ""},
+      {"ID": 46, "Zona": "Zona C", "Nombre comun": "Florisanto", "Nombre científico": "Brownea stenantha", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol en estado regular.", "Longitud": -75.8562733, "Latitud": 8.79157167, "Enlace foto": ""},
+      {"ID": 47, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol en estado regular.", "Longitud": -75.8564048, "Latitud": 8.79135948, "Enlace foto": ""},
+      {"ID": 48, "Zona": "Zona C", "Nombre comun": "Florisanto", "Nombre científico": "Brownea stenantha", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, con follaje verde y abundante, aparentemente en buen estado.", "Longitud": -75.8563367, "Latitud": 8.79158833, "Enlace foto": ""},
+      {"ID": 49, "Zona": "Zona C", "Nombre comun": "Guayabo", "Nombre científico": "Psidium guajava", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Follaje seco y presencia de frutos secos; estado fitosanitario deteriorado", "Longitud": -75.8570746, "Latitud": 8.79118633, "Enlace foto": ""},
+      {"ID": 50, "Zona": "Zona C", "Nombre comun": "Neem", "Nombre científico": "Azadirachta indica A. Juss", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adolescente, buen estado.", "Longitud": -75.8564767, "Latitud": 8.79156167, "Enlace foto": ""},
+      {"ID": 51, "Zona": "Zona C", "Nombre comun": "Florisanto", "Nombre científico": "Brownea stenantha", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol antiguo, con follaje verde y abundante, aparentemente en buen estado fitosanitario", "Longitud": -75.856445, "Latitud": 8.79142167, "Enlace foto": ""},
+      {"ID": 52, "Zona": "Zona C", "Nombre comun": "Neem", "Nombre científico": "Azadirachta indica A. Juss", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Follaje con aparente presencia de hongos; estado fitosanitario comprometido", "Longitud": -75.857553, "Latitud": 8.79121038, "Enlace foto": ""},
+      {"ID": 53, "Zona": "Zona C", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol con presencia de cañamulo, por ende, tiene riesgo fitosanitario.", "Longitud": -75.856565, "Latitud": 8.79139167, "Enlace foto": ""},
+      {"ID": 54, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco robusto con grietas visibles y follaje verde; presenta frutos en desarrollo", "Longitud": -75.8575843, "Latitud": 8.79122995, "Enlace foto": ""},
+      {"ID": 55, "Zona": "Zona C", "Nombre comun": "Neem", "Nombre científico": "Azadirachta indica A. Juss", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Follaje con aparente presencia de hongos; estado fitosanitario comprometido", "Longitud": -75.8566633, "Latitud": 8.79144667, "Enlace foto": ""},
+      {"ID": 56, "Zona": "Zona C", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Deteriorado debido al comején, riesgo fitosanitario.", "Longitud": -75.8574167, "Latitud": 8.792035, "Enlace foto": ""},
+      {"ID": 57, "Zona": "Zona C", "Nombre comun": "Laurel", "Nombre científico": "Laurus nobilis", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto y antiguo, con follaje verde y en aparente buen estado fitosanitario", "Longitud": -75.8572183, "Latitud": 8.792655, "Enlace foto": ""},
+      {"ID": 58, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol antiguo.", "Longitud": -75.8576417, "Latitud": 8.79271667, "Enlace foto": ""},
+      {"ID": 59, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Sin observaciones específicas", "Longitud": -75.857675, "Latitud": 8.79272333, "Enlace foto": ""},
+      {"ID": 60, "Zona": "Zona C", "Nombre comun": "Jobo", "Nombre científico": "Spondias mombin", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Árbol con tallo corto.", "Longitud": -75.857765, "Latitud": 8.79254333, "Enlace foto": ""},
+      {"ID": 61, "Zona": "Zona C", "Nombre comun": "Mango ingerto", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Árbol con tallo corto", "Longitud": -75.85791, "Latitud": 8.79174833, "Enlace foto": ""},
+      {"ID": 62, "Zona": "Zona C", "Nombre comun": "Pera roja", "Nombre científico": "Syzygium malaccense", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Produciendo, en buen estado.", "Longitud": -75.8579433, "Latitud": 8.79182, "Enlace foto": ""},
+      {"ID": 63, "Zona": "Zona C", "Nombre comun": "Almendro", "Nombre científico": "Prunus dulcis", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Tronco robusto y muy ramificado, con follaje abundante y presencia aparente de hongos; estado fitosanitario comprometido", "Longitud": -75.8579183, "Latitud": 8.79173667, "Enlace foto": ""},
+      {"ID": 64, "Zona": "Zona C", "Nombre comun": "Acacia roja", "Nombre científico": "Delonix regia", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Se encuentra en buen estado, sin riesgo fitosanitario.", "Longitud": -75.8579, "Latitud": 8.79174167, "Enlace foto": ""},
+      {"ID": 65, "Zona": "Zona C", "Nombre comun": "Acacia roja", "Nombre científico": "Delonix regia", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Buen estado, follaje sano con sus flores y frutos.", "Longitud": -75.857865, "Latitud": 8.791655, "Enlace foto": ""},
+      {"ID": 66, "Zona": "Zona C", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Follaje abundante y denso; tronco grueso, robusto y muy ramificado. Presenta algunas flores. No se observan signos evidentes de patógenos y se encuentra aparentemente sano", "Longitud": -75.8578583, "Latitud": 8.79159, "Enlace foto": ""},
+      {"ID": 67, "Zona": "Zona C", "Nombre comun": "Mango", "Nombre científico": "Mangifera indica", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Follaje abundante y denso; tronco grueso, robusto y muy ramificado. Presenta algunas flores. No se observan signos evidentes de patógenos y se encuentra aparentemente sano", "Longitud": -75.8578783, "Latitud": 8.79157167, "Enlace foto": ""},
+      {"ID": 68, "Zona": "Zona C", "Nombre comun": "Jambolán", "Nombre científico": "Syzygium cumini", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Buen estado, follaje y excelentes frutos", "Longitud": -75.8578583, "Latitud": 8.79152333, "Enlace foto": ""},
+      {"ID": 69, "Zona": "Zona C", "Nombre comun": "Roble", "Nombre científico": "Quercus robur", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tronco alto y delgado, con pocas ramificaciones y follaje concentrado en la copa. No se observan flores ni frutos, ni signos evidentes de patógenos", "Longitud": -75.85767, "Latitud": 8.791205, "Enlace foto": ""},
+      {"ID": 70, "Zona": "Zona C", "Nombre comun": "Roble", "Nombre científico": "Quercus robur", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Tronco alto y delgado, con pocas ramificaciones y follaje concentrado en la copa. No se observan flores ni frutos, ni signos evidentes de patógenos", "Longitud": -75.857585, "Latitud": 8.79121333, "Enlace foto": ""},
+      {"ID": 71, "Zona": "Zona C", "Nombre comun": "Almendro", "Nombre científico": "Prunus dulcis", "Clasificación biométrica": "Brinzal", "Estado fitosanitario/Observaciones": "Tronco robusto y muy ramificado, con follaje abundante y presencia aparente de hongos; estado fitosanitario comprometido", "Longitud": -75.8576217, "Latitud": 8.79127833, "Enlace foto": ""},
+      {"ID": 72, "Zona": "Zona C", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Corteza ligeramente deteriorada, con follaje verde y aparentemente sano", "Longitud": -75.8574617, "Latitud": 8.79215667, "Enlace foto": ""},
+      {"ID": 73, "Zona": "Zona D", "Nombre comun": "Florisanto", "Nombre científico": "Brownea stenantha", "Clasificación biométrica": "Latizal", "Estado fitosanitario/Observaciones": "Árbol antiguo, con follaje verde y abundante, aparentemente en buen estado fitosanitario", "Longitud": -75.8574017, "Latitud": 8.79204667, "Enlace foto": ""},
+      {"ID": 74, "Zona": "Zona D", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol antiguo, con manchas foliares asociadas a posible presencia de hongos y evidencia de comején; estado fitosanitario comprometido", "Longitud": -75.8574567, "Latitud": 8.79223167, "Enlace foto": ""},
+      {"ID": 75, "Zona": "Zona D", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Follaje escaso, con hojas marchitas y ausencia de flores y frutos; estado fitosanitario comprometido", "Longitud": -75.8574483, "Latitud": 8.79215667, "Enlace foto": ""},
+      {"ID": 76, "Zona": "Zona D", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Presencia de comején y moho, hojas pequeñas y parcialmente secas, con ramas delgadas; estado fitosanitario comprometido", "Longitud": -75.85745, "Latitud": 8.79214667, "Enlace foto": ""},
+      {"ID": 77, "Zona": "Zona D", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, con follaje verde y sano, sin signos evidentes de afectación", "Longitud": -75.8573983, "Latitud": 8.79189167, "Enlace foto": ""},
+      {"ID": 78, "Zona": "Zona D", "Nombre comun": "Desconocido", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Presencia de plantas parásitas, hojas y ramas secas; estado fitosanitario comprometido", "Longitud": -75.8573633, "Latitud": 8.79184667, "Enlace foto": ""},
+      {"ID": 79, "Zona": "Zona D", "Nombre comun": "Flor de la reina", "Nombre científico": "Lagerstroemia speciosa", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Árbol adulto, con raíces superficiales expuestas y presencia de flores y frutos", "Longitud": -75.857375, "Latitud": 8.791755, "Enlace foto": ""},
+      {"ID": 80, "Zona": "Zona D", "Nombre comun": "Sin nombre", "Nombre científico": "Desconocido", "Clasificación biométrica": "Fustal", "Estado fitosanitario/Observaciones": "Tiene frutos en crecimiento, hojas nuevas, ramas secas, hojas secas y raíz larga", "Longitud": -75.8573583, "Latitud": 8.79167167, "Enlace foto": ""}
+    ];
+    let treeData = [...initialTreeData];
+
+    const ZONE_COLORS = {
+      'Zona A': '#2e7d32',
+      'Zona B': '#1565c0',
+      'Zona C': '#e65100',
+      'Zona D': '#7b1fa2'
+    };
+
+    let originCoord = { lat: 8.792169, lng: -75.855913, name: "Entrada Principal INEM" };
+    let isSettingOrigin = false;
+    let isPickingLocationForForm = false;
+    let markersLayer = L.layerGroup();
+    let zonesLayer = L.layerGroup();
+    let vectorLine = null;
+    let originMarker = null;
+    let selectedTreeId = null;
+
+    let isMeasuringMode = false;
+    let measureNodeA = null;
+    let measureNodeB = null;
+    let measureVectorGroup = L.layerGroup();
+    let markerMeasureA = null;
+    let markerMeasureB = null;
+
+    let supabaseClient = null;
+    let adminPassword = localStorage.getItem('inem_admin_pass') || 'inem2026';
+    let isAdminLoggedIn = false;
+
+    let appSettings = JSON.parse(localStorage.getItem('inem_app_settings')) || {
+      schoolName: 'INEM Lorenzo María Lleras • PRAE',
+      qrMode: 'WEB_APP',
+      webBaseUrl: window.location.href.split('#')[0].split('?')[0],
+      templateUrl: 'https://drive.google.com/drive/folders/ARBOL_{ID}',
+      supabaseUrl: '',
+      supabaseKey: '',
+      supabaseBucket: 'fotos-arboles'
+    };
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast-item toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.add('show');
+      });
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          if (container.contains(toast)) container.removeChild(toast);
+        }, 300);
+      }, 3500);
+    }
+
+    function showConfirmDialog(title, message, onConfirm) {
+      document.getElementById('confirm-dialog-title').textContent = title;
+      document.getElementById('confirm-dialog-message').textContent = message;
+      
+      const modal = document.getElementById('modal-confirm-dialog');
+      const btnAccept = document.getElementById('btn-confirm-accept');
+      const btnCancel = document.getElementById('btn-confirm-cancel');
+
+      const cleanup = () => {
+        closeModal('modal-confirm-dialog');
+        btnAccept.onclick = null;
+        btnCancel.onclick = null;
+      };
+
+      btnAccept.onclick = () => {
+        cleanup();
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+
+      btnCancel.onclick = () => {
+        cleanup();
+      };
+
+      openModal('modal-confirm-dialog');
+    }
+
+    function handleOverlayClick(event, modalId) {
+      if (event.target && event.target.id === modalId) {
+        closeModal(modalId);
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const activeModals = document.querySelectorAll('.modal-overlay.active');
+        activeModals.forEach(m => m.classList.remove('active'));
+        if (isMeasuringMode) closeMeasurementMode();
+        clearVectorLine();
+        if (isSettingOrigin) {
+          isSettingOrigin = false;
+          const btnOrigin = document.getElementById('btn-change-origin');
+          if (btnOrigin) {
+            btnOrigin.textContent = 'Mover Origen';
+            btnOrigin.style.background = 'var(--primary)';
+          }
+        }
+        if (isPickingLocationForForm) {
+          isPickingLocationForForm = false;
+          openSettingsModal();
+          switchAdminTab('tab-arbol');
+        }
+      }
+    });
+
+    const map = L.map('map', {
+      center: [8.792000, -75.856400],
+      zoom: 18,
+      maxZoom: 21
+    });
+
+    map.on('popupclose', (e) => {
+      clearVectorLine();
+    });
+
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri, Maxar •',
+      maxZoom: 21
+    }).addTo(map);
+
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{y}/{x}'.replace('{s}', 'a'), {
+      attribution: '&copy; OpenStreetMap • &copy; Autores: C. Cantero, L. Tirado, L. Jiménez | Colab: A. Estrada Martinez (INEM)',
+      maxZoom: 19
+    });
+
+    L.control.layers({
+      "Satelital (Recomendada)": satelliteLayer,
+      "Mapa Callejero": osmLayer
+    }).addTo(map);
+
+    zonesLayer.addTo(map);
+    markersLayer.addTo(map);
+    measureVectorGroup.addTo(map);
+
+    function initSupabase() {
+      if (appSettings.supabaseUrl && appSettings.supabaseKey) {
+        try {
+          supabaseClient = supabase.createClient(appSettings.supabaseUrl, appSettings.supabaseKey);
+          updateCloudStatusBadge(true, "Conectado");
+          fetchTreesFromSupabase();
+        } catch (e) {
+          console.error("Error al inicializar Supabase:", e);
+          updateCloudStatusBadge(false, "Error Llaves");
+        }
+      } else {
+        updateCloudStatusBadge(false, "Modo Local");
+      }
+    }
+
+    function updateCloudStatusBadge(isConnected, text) {
+      const dot = document.getElementById('cloud-dot');
+      const lbl = document.getElementById('cloud-status-text');
+      dot.className = isConnected ? 'cloud-dot connected' : 'cloud-dot local';
+      lbl.textContent = text;
+    }
+
+    async function fetchTreesFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('arboles')
+          .select('*')
+          .order('numero_arbol', { ascending: true });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          treeData = data.map(item => ({
+            _db_id: item.id,
+            ID: item.numero_arbol,
+            Zona: item.zona,
+            "Nombre comun": item.nombre_comun,
+            "Nombre científico": item.nombre_cientifico || 'Desconocido',
+            "Familia Botánica": item.familia_botanica || '',
+            "Origen Biogeográfico": item.origen_biogeografico || '',
+            "Servicios Ecosistémicos": item.servicios_ecosistemicos || '',
+            "Clasificación biométrica": item.clasificacion_biometrica || 'No aplica',
+            "Estado fitosanitario/Observaciones": item.estado_fitosanitario || '',
+            Latitud: parseFloat(item.latitud),
+            Longitud: parseFloat(item.longitud),
+            "Enlace foto": item.foto_url || ''
+          }));
+
+          updateCloudStatusBadge(true, `Nube (${treeData.length})`);
+          syncDatasetState();
+        }
+      } catch (err) {
+        console.warn("No se pudo cargar desde Supabase. Manteniendo base local:", err.message);
+        updateCloudStatusBadge(false, "Error Nube");
+      }
+    }
+
+    function syncDatasetState() {
+      renderTrees();
+      renderZonePolygons();
+      populateQuickEditDropdown();
+      renderSinglePlacaStation();
+    }
+
+    function calculateVector(fromLat, fromLng, toLat, toLng) {
+      if (!Number.isFinite(fromLat) || !Number.isFinite(fromLng) || !Number.isFinite(toLat) || !Number.isFinite(toLng)) {
+        return { dx: "0.00", dy: "0.00", magnitud: "0.00", rumbo: "0.0", cardinal: "N" };
+      }
+
+      const R = 6371000;
+      const latMid = ((fromLat + toLat) / 2) * (Math.PI / 180);
+      
+      const deltaX = (toLng - fromLng) * (Math.PI / 180) * R * Math.cos(latMid);
+      const deltaY = (toLat - fromLat) * (Math.PI / 180) * R;
+      const magnitud = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      let rumbo = Math.atan2(deltaX, deltaY) * (180 / Math.PI);
+      if (rumbo < 0) rumbo += 360;
+
+      const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+      const cardinal = directions[Math.round(rumbo / 22.5) % 16];
+
+      return {
+        dx: deltaX.toFixed(2),
+        dy: deltaY.toFixed(2),
+        magnitud: magnitud.toFixed(2),
+        rumbo: rumbo.toFixed(1),
+        cardinal: cardinal
+      };
+    }
+
+    function createTreeMarkerIcon(treeId, zoneName) {
+      const color = ZONE_COLORS[zoneName] || '#2e7d32';
+      const svgIcon = `
+        <svg viewBox="0 0 36 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 44C18 44 33 28 33 16.5C33 8.21573 26.2843 1.5 18 1.5C9.71573 1.5 3 8.21573 3 16.5C3 28 18 44 18 44Z" fill="${color}" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="18" cy="18" r="11" fill="#ffffff" fill-opacity="0.95"/>
+          <path d="M18 10C15.8 10 14 11.5 14 13.5C14 14.1 14.2 14.7 14.5 15.1C13.6 15.6 13 16.6 13 17.7C13 19.3 14.3 20.6 16 20.7V23.5C16 24.1 16.4 24.5 17 24.5H19C19.6 24.5 20 24.1 20 23.5V20.7C21.7 20.6 23 19.3 23 17.7C23 16.6 22.4 15.6 21.5 15.1C21.8 14.7 22 14.1 22 13.5C22 11.5 20.2 10 18 10Z" fill="${color}"/>
+        </svg>
+      `;
+
+      return L.divIcon({
+        className: 'tree-marker-container',
+        html: svgIcon,
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+        popupAnchor: [0, -32]
+      });
+    }
+
+    function updateOriginMarker() {
+      if (originMarker) map.removeLayer(originMarker);
+
+      const originIcon = L.divIcon({
+        className: 'origin-marker-icon',
+        html: '⨁',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+
+      originMarker = L.marker([originCoord.lat, originCoord.lng], {
+        icon: originIcon,
+        draggable: isAdminLoggedIn
+      }).addTo(map);
+
+      originMarker.bindTooltip("<b>ORIGEN (0, 0)</b><br>Entrada Principal INEM", { permanent: false, direction: 'top' });
+
+      originMarker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+      });
+
+      originMarker.on('dragend', function (e) {
+        if (!isAdminLoggedIn) return;
+        const newPos = e.target.getLatLng();
+        originCoord.lat = newPos.lat;
+        originCoord.lng = newPos.lng;
+        document.getElementById('origin-coords').textContent = `${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}`;
+        renderTrees();
+        renderSinglePlacaStation();
+        if (selectedTreeId) selectTree(selectedTreeId, false);
+      });
+
+      document.getElementById('origin-coords').textContent = `${originCoord.lat.toFixed(6)}, ${originCoord.lng.toFixed(6)}`;
+    }
+
+    function convexHull(points) {
+      if (points.length <= 2) return points;
+      const sorted = [...points].sort((a, b) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
+      
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      
+      const lower = [];
+      for (let p of sorted) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+      }
+      
+      const upper = [];
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        const p = sorted[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+      }
+      
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    function renderZonePolygons() {
+      zonesLayer.clearLayers();
+      const showZones = document.getElementById('chk-show-zones').checked;
+      const showLabels = document.getElementById('chk-show-labels').checked;
+      if (!showZones) return;
+
+      const zones = ['Zona A', 'Zona B', 'Zona C', 'Zona D'];
+      
+      zones.forEach(zone => {
+        const points = treeData
+          .filter(t => t.Zona === zone && t.Latitud >= 8.790000 && t.Latitud <= 8.795000 && t.Longitud >= -75.860000 && t.Longitud <= -75.854000)
+          .map(t => [t.Latitud, t.Longitud]);
+
+        if (points.length >= 3) {
+          const hull = convexHull(points);
+          const color = ZONE_COLORS[zone] || '#1b5e20';
+          
+          const polygon = L.polygon(hull, {
+            color: color,
+            weight: 2,
+            opacity: 0.85,
+            dashArray: '5, 5',
+            fillColor: color,
+            fillOpacity: 0.16
+          });
+
+          if (showLabels) {
+            const zoneClassMap = {
+              'Zona A': 'label-zona-a',
+              'Zona B': 'label-zona-b',
+              'Zona C': 'label-zona-c',
+              'Zona D': 'label-zona-d'
+            };
+            const zoneClass = zoneClassMap[zone] || '';
+
+            polygon.bindTooltip(
+              `<span style="color:${color}; display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+                <span style="width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block; box-shadow:0 0 4px ${color};"></span>
+                <span>${escapeHtml(zone)}</span>
+              </span>`, {
+                permanent: true,
+                direction: 'center',
+                className: `zone-badge-label ${zoneClass}`
+              }
+            );
+          }
+
+          polygon.on('mouseover', function () {
+            this.setStyle({ fillOpacity: 0.28, weight: 3 });
+          });
+          polygon.on('mouseout', function () {
+            this.setStyle({ fillOpacity: 0.16, weight: 2 });
+          });
+          polygon.on('click', function (e) {
+            L.DomEvent.stopPropagation(e);
+            const filterEl = document.getElementById('zone-filter');
+            if (filterEl) {
+              filterEl.value = zone;
+              renderTrees();
+            }
+          });
+
+          zonesLayer.addLayer(polygon);
+        }
+      });
+    }
+
+    function setupZoomLabelManager() {
+      const mapContainer = document.getElementById('map');
+      function checkZoom() {
+        if (map.getZoom() >= 19) {
+          mapContainer.classList.add('map-zoomed-in');
+        } else {
+          mapContainer.classList.remove('map-zoomed-in');
+        }
+      }
+      map.on('zoomend', checkZoom);
+      checkZoom();
+    }
+
+    function getTreeUrl(treeId) {
+      const baseUrl = appSettings.webBaseUrl || window.location.href.split('#')[0].split('?')[0];
+      return `${baseUrl}#tree-${encodeURIComponent(treeId)}`;
+    }
+
+    function generateQrSvg(text, size = 120) {
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData(text);
+        qr.make();
+        return qr.createSvgTag({ scalable: true, margin: 1 });
+      } catch (e) {
+        return `<div style="font-size:10px;color:red;">Error QR</div>`;
+      }
+    }
+
+    function clearVectorLine() {
+      if (vectorLine) {
+        map.removeLayer(vectorLine);
+        vectorLine = null;
+      }
+      selectedTreeId = null;
+      document.querySelectorAll('.tree-card.active').forEach(c => c.classList.remove('active'));
+    }
+
+    function renderTrees() {
+      markersLayer.clearLayers();
+      const listContainer = document.getElementById('tree-list');
+      listContainer.innerHTML = '';
+
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      const zoneFilter = document.getElementById('zone-filter').value;
+
+      const filtered = treeData.filter(tree => {
+        const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+        const matchZone = zoneFilter === 'ALL' || tree.Zona === zoneFilter;
+        const matchQuery = tree['Nombre comun'].toLowerCase().includes(query) ||
+                           tree['Nombre científico'].toLowerCase().includes(query) ||
+                           bot.family.toLowerCase().includes(query) ||
+                           bot.origin.toLowerCase().includes(query) ||
+                           String(tree.ID).includes(query);
+        return matchZone && matchQuery;
+      });
+
+      document.getElementById('stats-badge').textContent = `${filtered.length} de ${treeData.length} árboles`;
+
+      filtered.forEach(tree => {
+        const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+        const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+        const marker = L.marker([tree.Latitud, tree.Longitud], {
+          icon: createTreeMarkerIcon(tree.ID, tree.Zona)
+        });
+
+        const photoHtml = tree['Enlace foto'] ? 
+          `<img src="${escapeHtml(tree['Enlace foto'])}" class="tree-popup-photo" alt="Foto árbol" onclick="window.open('${escapeHtml(tree['Enlace foto'])}','_blank')">` : '';
+
+        const editBtnHtml = isAdminLoggedIn ? 
+          `<button class="origin-btn" style="background:#16a34a; font-size:0.68rem;" onclick="openEditTreeModal(${tree.ID})">✏️ Editar</button>` : '';
+
+        // Micro-insignias botánicas
+        const originClass = bot.native === true ? 'pill-native' : (bot.native === false ? 'pill-exotic' : 'pill-family');
+        const originIcon = bot.native === true ? '🌿' : (bot.native === false ? '🌍' : '🌱');
+        const servicesHtml = (bot.services || []).map(s => `<span class="micro-pill pill-service">✨ ${escapeHtml(s)}</span>`).join('');
+
+        // Popup enfocado limpiamente en la información biológica, fitosanitaria y física
+        const popupContent = `
+          <div style="font-size:0.82rem; line-height:1.4; padding:4px; max-width:280px;">
+            ${photoHtml}
+            <div style="font-size:1.05rem; font-weight:700; color:#1b5e20; border-bottom:1px solid #cbd5e1; padding-bottom:3px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+              <span>#${tree.ID} - ${escapeHtml(tree['Nombre comun'])}</span>
+              ${editBtnHtml}
+            </div>
+            
+            <div style="color:#64748b; font-size:0.77rem; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:3px;">
+              <span style="font-style:italic;">${escapeHtml(tree['Nombre científico'])}</span>
+              <span style="font-weight:600; color:#334155;">(${escapeHtml(bot.family)})</span>
+            </div>
+
+            <!-- Fila de Micro-Insignias Ecológicas -->
+            <div class="botanical-pills-row">
+              <span class="micro-pill ${originClass}">${originIcon} ${escapeHtml(bot.origin)}</span>
+              ${servicesHtml}
+            </div>
+
+            <p style="margin-top:4px;">
+              <span style="background:${ZONE_COLORS[tree.Zona]}; color:white; font-size:0.67rem; font-weight:700; padding:2px 7px; border-radius:10px;">${escapeHtml(tree.Zona)}</span>
+              <span style="background:#e2e8f0; color:#334155; font-size:0.67rem; font-weight:600; padding:2px 6px; border-radius:4px; margin-left:3px;">${escapeHtml(tree['Clasificación biométrica'])}</span>
+            </p>
+            <div style="margin-top:6px; font-size:0.74rem; color:#334155; background:#f8fafc; padding:5px 7px; border-radius:5px; border-left:3px solid #94a3b8;">
+              <b>Estado:</b> ${escapeHtml(tree['Estado fitosanitario/Observaciones'])}
+            </div>
+            <div style="margin-top:7px; background:#fff7ed; border-left:3px solid #f97316; padding:5px 7px; border-radius:5px; font-size:0.75rem;">
+              <strong>Vector posición respecto al Origen (0,0):</strong><br>
+              &bull; <b>r&#8407;</b> = (${vec.dx}&icirc; + ${vec.dy}&jcirc;) m<br>
+              &bull; <b>Distancia (|r|):</b> ${vec.magnitud} metros<br>
+              &bull; <b>Rumbo:</b> ${vec.rumbo}&deg; (${vec.cardinal})
+            </div>
+            <div style="margin-top:9px; display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <button class="origin-btn" style="background:#2563eb; width:100%; justify-content:center;" onclick="startMeasureWithTree(${tree.ID})">📏 Medir Vector desde este Árbol</button>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+
+        marker.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          if (isMeasuringMode) {
+            handleMeasurementClick(tree);
+          } else {
+            selectTree(tree.ID, false);
+          }
+        });
+
+        markersLayer.addLayer(marker);
+        tree._marker = marker;
+
+        const card = document.createElement('div');
+        card.className = `tree-card ${selectedTreeId === tree.ID ? 'active' : ''}`;
+        card.id = `card-${tree.ID}`;
+
+        const thumbImg = tree['Enlace foto'] ? 
+          `<img src="${escapeHtml(tree['Enlace foto'])}" class="thumb-mini" alt="foto">` : '';
+
+        const editCardBtnHtml = isAdminLoggedIn ? 
+          `<button class="origin-btn" style="background:#dcfce7; color:#166534; border:1px solid #86efac; font-weight:700; font-size:0.66rem; padding:2px 6px;" onclick="event.stopPropagation(); openEditTreeModal(${tree.ID})">✏️ Editar</button>` : '';
+
+        card.innerHTML = `
+          <h4>
+            <span>#${tree.ID} ${escapeHtml(tree['Nombre comun'])}</span>
+            <span class="zone-tag" style="background:${ZONE_COLORS[tree.Zona]};">${escapeHtml(tree.Zona)}</span>
+          </h4>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="scientific">${escapeHtml(tree['Nombre científico'])} • <span style="font-weight:600; color:#475569;">(${escapeHtml(bot.family)})</span></div>
+            ${thumbImg}
+          </div>
+          <div style="display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px;">
+            <span class="micro-pill ${originClass}" style="font-size:0.6rem; padding:1px 5px;">${originIcon} ${escapeHtml(bot.origin)}</span>
+            <span class="micro-pill pill-service" style="font-size:0.6rem; padding:1px 5px;">✨ ${escapeHtml(bot.services[0] || 'Servicio ecosistémico')}</span>
+          </div>
+          <div class="vector-preview">
+            <span><b>${vec.magnitud} m</b> | (${vec.dx}&icirc;, ${vec.dy}&jcirc;) m</span>
+            <div style="display:flex; gap:4px;">
+              ${editCardBtnHtml}
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          if (isMeasuringMode) {
+            handleMeasurementClick(tree);
+          } else {
+            selectTree(tree.ID, true);
+          }
+        });
+
+        listContainer.appendChild(card);
+      });
+    }
+
+    function selectTree(treeId, shouldPan) {
+      selectedTreeId = treeId;
+      const tree = treeData.find(t => t.ID === treeId);
+      if (!tree) return;
+
+      drawVectorLine(tree);
+
+      if (tree._marker) {
+        tree._marker.openPopup();
+        if (shouldPan) {
+          map.setView([tree.Latitud, tree.Longitud], 19, { animate: true });
+        }
+      }
+
+      document.querySelectorAll('.tree-card').forEach(c => c.classList.remove('active'));
+      const activeCard = document.getElementById(`card-${treeId}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function drawVectorLine(tree) {
+      if (vectorLine) {
+        map.removeLayer(vectorLine);
+        vectorLine = null;
+      }
+
+      const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+
+      vectorLine = L.polyline([
+        [originCoord.lat, originCoord.lng],
+        [tree.Latitud, tree.Longitud]
+      ], {
+        color: '#f97316',
+        weight: 3.5,
+        dashArray: '6, 8',
+        opacity: 0.95
+      }).addTo(map);
+
+      vectorLine.bindTooltip(`<b>|r| = ${vec.magnitud} m</b> (${vec.cardinal})`, {
+        permanent: true,
+        direction: 'center'
+      }).openTooltip();
+    }
+
+    function toggleMeasurementMode() {
+      isMeasuringMode = !isMeasuringMode;
+      const btn = document.getElementById('btn-measure-vector');
+      const guideBox = document.getElementById('measure-guide-box');
+      
+      if (isMeasuringMode) {
+        btn.classList.add('active');
+        guideBox.style.display = 'block';
+        document.getElementById('measure-step-text').innerHTML = "Paso 1: Haz clic en el <b>Árbol A</b> (Punto inicial).";
+        measureNodeA = null;
+        measureNodeB = null;
+        clearMeasurementLayers();
+        showToast("Modo Medición activo: selecciona el Árbol A en el mapa.", "info");
+      } else {
+        btn.classList.remove('active');
+        guideBox.style.display = 'none';
+        closeMeasurementMode();
+      }
+    }
+
+    function startMeasureWithTree(treeId) {
+      const tree = treeData.find(t => t.ID === treeId);
+      if (!tree) return;
+      if (!isMeasuringMode) toggleMeasurementMode();
+      handleMeasurementClick(tree);
+    }
+
+    function handleMeasurementClick(tree) {
+      if (!measureNodeA) {
+        measureNodeA = tree;
+        document.getElementById('measure-step-text').innerHTML = `Nodo A fijado: <b>#${tree.ID} ${escapeHtml(tree['Nombre comun'])}</b>.<br>Paso 2: Haz clic en el <b>Árbol B</b> (Destino).`;
+        renderMeasurementNodes();
+        showToast(`Nodo A fijado: #${tree.ID}. Ahora haz clic en el Árbol B.`, "info");
+      } else if (!measureNodeB) {
+        if (measureNodeA.ID === tree.ID) {
+          showToast("Selecciona un árbol diferente para el Árbol B.", "warning");
+          return;
+        }
+        measureNodeB = tree;
+        document.getElementById('measure-step-text').innerHTML = `Medición completa: <b>#${measureNodeA.ID} → #${measureNodeB.ID}</b>.`;
+        renderMeasurementNodes();
+        calculateAndDisplayMeasurement();
+        showToast(`Vector trazado: #${measureNodeA.ID} → #${measureNodeB.ID}`, "success");
+      } else {
+        measureNodeA = tree;
+        measureNodeB = null;
+        document.getElementById('measure-step-text').innerHTML = `Nuevo Nodo A: <b>#${tree.ID} ${escapeHtml(tree['Nombre comun'])}</b>.<br>Paso 2: Haz clic en el <b>Árbol B</b>.`;
+        document.getElementById('floating-vector-card').style.display = 'none';
+        renderMeasurementNodes();
+        showToast(`Nuevo Nodo A: #${tree.ID}. Ahora haz clic en el Árbol B.`, "info");
+      }
+    }
+
+    function renderMeasurementNodes() {
+      measureVectorGroup.clearLayers();
+      markerMeasureA = null;
+      markerMeasureB = null;
+
+      if (measureNodeA) {
+        markerMeasureA = L.marker([measureNodeA.Latitud, measureNodeA.Longitud], {
+          icon: L.divIcon({
+            className: 'measure-badge-icon node-a',
+            html: 'A',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          }),
+          zIndexOffset: 1000
+        });
+        markerMeasureA.bindTooltip(`<b>Punto Inicial (A):</b> #${measureNodeA.ID} ${escapeHtml(measureNodeA['Nombre comun'])}`, {
+          direction: 'top',
+          offset: [0, -12]
+        });
+        measureVectorGroup.addLayer(markerMeasureA);
+      }
+
+      if (measureNodeB && measureNodeA) {
+        markerMeasureB = L.marker([measureNodeB.Latitud, measureNodeB.Longitud], {
+          icon: L.divIcon({
+            className: 'measure-badge-icon node-b',
+            html: 'B',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+          }),
+          zIndexOffset: 1001
+        });
+        markerMeasureB.bindTooltip(`<b>Punto Destino (B):</b> #${measureNodeB.ID} ${escapeHtml(measureNodeB['Nombre comun'])}`, {
+          direction: 'top',
+          offset: [0, -12]
+        });
+        measureVectorGroup.addLayer(markerMeasureB);
+
+        // 1. Línea exterior blanca
+        const borderLine = L.polyline([
+          [measureNodeA.Latitud, measureNodeA.Longitud],
+          [measureNodeB.Latitud, measureNodeB.Longitud]
+        ], {
+          color: '#ffffff',
+          weight: 7,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        measureVectorGroup.addLayer(borderLine);
+
+        // 2. Línea principal azul cobalto
+        const mainLine = L.polyline([
+          [measureNodeA.Latitud, measureNodeA.Longitud],
+          [measureNodeB.Latitud, measureNodeB.Longitud]
+        ], {
+          color: '#2563eb',
+          weight: 4.5,
+          opacity: 1,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        measureVectorGroup.addLayer(mainLine);
+
+        // 3. Flecha direccional SVG en el extremo B
+        const pA = map.latLngToLayerPoint([measureNodeA.Latitud, measureNodeA.Longitud]);
+        const pB = map.latLngToLayerPoint([measureNodeB.Latitud, measureNodeB.Longitud]);
+        const angleDeg = Math.atan2(pB.y - pA.y, pB.x - pA.x) * (180 / Math.PI);
+
+        const arrowLat = measureNodeA.Latitud + (measureNodeB.Latitud - measureNodeA.Latitud) * 0.72;
+        const arrowLng = measureNodeA.Longitud + (measureNodeB.Longitud - measureNodeA.Longitud) * 0.72;
+
+        const arrowSvg = `
+          <div style="transform: rotate(${angleDeg}deg); width:24px; height:24px;">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M4 12H19M19 12L12 5M19 12L12 19" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 12H19M19 12L12 5M19 12L12 19" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        `;
+
+        const arrowMarker = L.marker([arrowLat, arrowLng], {
+          icon: L.divIcon({
+            className: 'vector-arrowhead-icon',
+            html: arrowSvg,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          }),
+          interactive: false,
+          zIndexOffset: 999
+        });
+        measureVectorGroup.addLayer(arrowMarker);
+
+        // 4. Etiqueta flotante con estilo de cápsula sobre el centro del vector
+        const vec = calculateVector(measureNodeA.Latitud, measureNodeA.Longitud, measureNodeB.Latitud, measureNodeB.Longitud);
+        mainLine.bindTooltip(`
+          <span style="display:inline-flex; align-items:center; gap:5px;">
+            <span>📐 Δr&#8407;<sub>AB</sub>:</span>
+            <b style="color:#60a5fa;">${vec.magnitud} m</b>
+            <span style="color:#fde047;">(${vec.cardinal} • ${vec.rumbo}°)</span>
+          </span>
+        `, {
+          permanent: true,
+          direction: 'center',
+          className: 'measure-vector-pill-tooltip'
+        }).openTooltip();
+      }
+    }
+
+    function calculateAndDisplayMeasurement() {
+      if (!measureNodeA || !measureNodeB) return;
+
+      const vec = calculateVector(measureNodeA.Latitud, measureNodeA.Longitud, measureNodeB.Latitud, measureNodeB.Longitud);
+      const vecA = calculateVector(originCoord.lat, originCoord.lng, measureNodeA.Latitud, measureNodeA.Longitud);
+      const vecB = calculateVector(originCoord.lat, originCoord.lng, measureNodeB.Latitud, measureNodeB.Longitud);
+
+      const card = document.getElementById('floating-vector-card');
+      document.getElementById('vec-node-a-title').textContent = `#${measureNodeA.ID} (${escapeHtml(measureNodeA['Nombre comun'])})`;
+      document.getElementById('vec-node-b-title').textContent = `#${measureNodeB.ID} (${escapeHtml(measureNodeB['Nombre comun'])})`;
+
+      document.getElementById('floating-vector-body').innerHTML = `
+        <div style="font-size:0.75rem; margin-bottom:5px; line-height:1.4;">
+          • <b>Nodo A (#${measureNodeA.ID}):</b> (${vecA.dx}&icirc; + ${vecA.dy}&jcirc;) m desde Entrada<br>
+          • <b>Nodo B (#${measureNodeB.ID}):</b> (${vecB.dx}&icirc; + ${vecB.dy}&jcirc;) m desde Entrada
+        </div>
+        <div style="background:#dbeafe; padding:8px; border-radius:6px; font-size:0.78rem; border-left:3px solid #2563eb;">
+          <b style="color:#1e40af;">Vector Relativo: &Delta;r&#8407;<sub>AB</sub> = r&#8407;<sub>B</sub> - r&#8407;<sub>A</sub></b><br>
+          &bull; <b>&Delta;r&#8407;<sub>AB</sub></b> = (${vec.dx}&icirc; + ${vec.dy}&jcirc;) metros<br>
+          &bull; <b>Distancia en línea recta:</b> <span style="font-size:0.98rem; font-weight:800; color:#1d4ed8;">${vec.magnitud} m</span><br>
+          &bull; <b>Rumbo / Azimut Polar:</b> ${vec.rumbo}&deg; (${vec.cardinal})
+        </div>
+      `;
+
+      card.style.display = 'block';
+    }
+
+    function invertMeasurementNodes() {
+      if (!measureNodeA || !measureNodeB) return;
+      const temp = measureNodeA;
+      measureNodeA = measureNodeB;
+      measureNodeB = temp;
+      renderMeasurementNodes();
+      calculateAndDisplayMeasurement();
+      showToast(`Sentido vectorial invertido: #${measureNodeA.ID} → #${measureNodeB.ID}`, "info");
+    }
+
+    function clearMeasurementLayers() {
+      measureVectorGroup.clearLayers();
+      markerMeasureA = null;
+      markerMeasureB = null;
+      document.getElementById('floating-vector-card').style.display = 'none';
+    }
+
+    function closeMeasurementMode() {
+      isMeasuringMode = false;
+      document.getElementById('btn-measure-vector').classList.remove('active');
+      document.getElementById('measure-guide-box').style.display = 'none';
+      clearMeasurementLayers();
+      measureNodeA = null;
+      measureNodeB = null;
+    }
+
+    function toggleFullscreen() {
+      const btn = document.getElementById('btn-toggle-fullscreen');
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          btn.innerHTML = '🗗 Salir Pantalla Completa';
+        }).catch(err => {
+          showToast(`Error al activar pantalla completa: ${err.message}`, "error");
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            btn.innerHTML = '⛶ Pantalla Completa';
+          });
+        }
+      }
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      const btn = document.getElementById('btn-toggle-fullscreen');
+      if (document.fullscreenElement) {
+        btn.innerHTML = '🗗 Salir Pantalla Completa';
+      } else {
+        btn.innerHTML = '⛶ Pantalla Completa';
+      }
+      setTimeout(() => map.invalidateSize(), 300);
+    });
+
+    function exportToExcelCSV() {
+      if (!isAdminLoggedIn) {
+        showToast("Debes iniciar sesión como Administrador para descargar la base de datos.", "warning");
+        handleAdminAccessClick();
+        return;
+      }
+
+      if (typeof XLSX !== 'undefined') {
+        const rows = treeData.map(tree => {
+          const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+          const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+          return {
+            "ID": tree.ID,
+            "Zona": tree.Zona,
+            "Nombre Común": tree['Nombre comun'],
+            "Nombre Científico": tree['Nombre científico'],
+            "Familia Botánica": bot.family,
+            "Origen Biogeográfico": bot.origin,
+            "Servicios Ecosistémicos": (bot.services || []).join(" • "),
+            "Clasificación Biométrica": tree['Clasificación biométrica'],
+            "Estado Fitosanitario / Observaciones": tree['Estado fitosanitario/Observaciones'],
+            "Latitud": tree.Latitud,
+            "Longitud": tree.Longitud,
+            "Vector Δx Este (m)": parseFloat(vec.dx),
+            "Vector Δy Norte (m)": parseFloat(vec.dy),
+            "Distancia Magnitud |r| (m)": parseFloat(vec.magnitud),
+            "Rumbo (°)": parseFloat(vec.rumbo),
+            "Dirección Cardinal": vec.cardinal,
+            "Origen Referencia": originCoord.name,
+            "Origen Latitud": originCoord.lat,
+            "Origen Longitud": originCoord.lng,
+            "Enlace Foto": tree['Enlace foto'] || ''
+          };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+
+        worksheet['!cols'] = [
+          { wch: 6 },  { wch: 10 }, { wch: 20 }, { wch: 25 }, { wch: 18 },
+          { wch: 22 }, { wch: 32 }, { wch: 18 }, { wch: 45 }, { wch: 13 },
+          { wch: 13 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 12 },
+          { wch: 18 }, { wch: 24 }, { wch: 15 }, { wch: 15 }, { wch: 30 }
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario_Flora_INEM");
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(workbook, `INVENTARIO_FLORISTICO_VECTORES_INEM_${dateStr}.xlsx`);
+        showToast("Descarga de Excel completada con éxito.", "success");
+        return;
+      }
+
+      // Respaldo CSV UTF-8 con BOM
+      const headers = [
+        "ID", "Zona", "Nombre comun", "Nombre científico", "Familia_Botanica", "Origen_Biogeografico",
+        "Servicios_Ecosistemicos", "Clasificación biométrica", "Estado fitosanitario/Observaciones",
+        "Latitud", "Longitud", "Enlace_Foto", "Vector_dx_Este_metros", "Vector_dy_Norte_metros",
+        "Distancia_Magnitud_metros", "Rumbo_grados", "Direccion_Cardinal", "Origen_Referencia",
+        "Origen_Latitud", "Origen_Longitud"
+      ];
+
+      const csvRows = [headers.join(",")];
+
+      treeData.forEach(tree => {
+        const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+        const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+        const cleanText = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+
+        const row = [
+          tree.ID, cleanText(tree.Zona), cleanText(tree['Nombre comun']),
+          cleanText(tree['Nombre científico']), cleanText(bot.family), cleanText(bot.origin),
+          cleanText((bot.services || []).join(" - ")), cleanText(tree['Clasificación biométrica']),
+          cleanText(tree['Estado fitosanitario/Observaciones']), tree.Latitud, tree.Longitud,
+          cleanText(tree['Enlace foto']), vec.dx, vec.dy, vec.magnitud, vec.rumbo,
+          cleanText(vec.cardinal), cleanText(originCoord.name), originCoord.lat, originCoord.lng
+        ];
+
+        csvRows.push(row.join(","));
+      });
+
+      const csvString = "\uFEFF" + csvRows.join("\r\n");
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      
+      const dateStr = new Date().toISOString().slice(0,10);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `INVENTARIO_FLORISTICO_VECTORES_INEM_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("Descarga de CSV completada con éxito.", "success");
+    }
+
+    function openStatsModal() {
+      const total = treeData.length || 1;
+      document.getElementById('kpi-total').textContent = treeData.length;
+      
+      const uniqueSpecies = new Set(
+        treeData
+          .map(t => (t['Nombre científico'] || '').trim())
+          .filter(name => name && name.toLowerCase() !== 'desconocido' && name.toLowerCase() !== 'sin nombre')
+      );
+      document.getElementById('kpi-species').textContent = uniqueSpecies.size;
+
+      // 1. Distribución por Zona
+      const zoneCounts = { 'Zona A': 0, 'Zona B': 0, 'Zona C': 0, 'Zona D': 0 };
+      treeData.forEach(t => {
+        if (zoneCounts.hasOwnProperty(t.Zona)) {
+          zoneCounts[t.Zona]++;
+        } else {
+          zoneCounts[t.Zona] = (zoneCounts[t.Zona] || 0) + 1;
+        }
+      });
+
+      let topZoneName = 'Zona A';
+      let maxZoneCount = -1;
+      for (const [zName, zCount] of Object.entries(zoneCounts)) {
+        if (zCount > maxZoneCount) {
+          maxZoneCount = zCount;
+          topZoneName = zName;
+        }
+      }
+      const topZoneEl = document.getElementById('kpi-top-zone');
+      if (topZoneEl) {
+        topZoneEl.textContent = `${topZoneName} (${maxZoneCount})`;
+        topZoneEl.style.color = ZONE_COLORS[topZoneName] || '#2563eb';
+      }
+
+      const zoneStatsContainer = document.getElementById('zone-stats-container');
+      zoneStatsContainer.innerHTML = '';
+
+      Object.entries(zoneCounts).forEach(([zoneName, count]) => {
+        const pct = Math.round((count / total) * 100);
+        const zColor = ZONE_COLORS[zoneName] || '#2e7d32';
+
+        const item = document.createElement('div');
+        item.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem; cursor:pointer; transition:all 0.2s;';
+        item.title = `Haz clic para filtrar el mapa por ${zoneName}`;
+        item.onmouseenter = () => item.style.borderColor = zColor;
+        item.onmouseleave = () => item.style.borderColor = '#cbd5e1';
+        item.onclick = () => {
+          closeModal('modal-stats');
+          const filterEl = document.getElementById('zone-filter');
+          if (filterEl) {
+            filterEl.value = zoneName;
+            renderTrees();
+          }
+        };
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+            <span style="font-weight:700; color:#1e293b; display:inline-flex; align-items:center; gap:6px;">
+              <span style="width:8px; height:8px; border-radius:50%; background:${zColor}; display:inline-block;"></span>
+              ${escapeHtml(zoneName)}
+            </span>
+            <span style="font-weight:700; color:${zColor};">${count} árboles (${pct}%)</span>
+          </div>
+          <div style="background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
+            <div style="background:${zColor}; height:100%; width:${pct}%;"></div>
+          </div>
+        `;
+        zoneStatsContainer.appendChild(item);
+      });
+
+      // 2. Clasificación Biométrica
+      const bioCounts = { 'Fustal': 0, 'Latizal': 0, 'Brinzal': 0, 'No aplica': 0 };
+      treeData.forEach(t => {
+        const bio = t['Clasificación biométrica'] || 'No aplica';
+        bioCounts[bio] = (bioCounts[bio] || 0) + 1;
+      });
+
+      const bioDescriptions = {
+        'Fustal': 'Árbol adulto maduro (DAP > 10 cm)',
+        'Latizal': 'Árbol en desarrollo juvenil',
+        'Brinzal': 'Plántula / Regeneración natural',
+        'No aplica': 'Palmas, arbustos y ornamentales'
+      };
+
+      const bioColors = {
+        'Fustal': '#166534',
+        'Latizal': '#0284c7',
+        'Brinzal': '#16a34a',
+        'No aplica': '#7c3aed'
+      };
+
+      const biometricStatsContainer = document.getElementById('biometric-stats-container');
+      biometricStatsContainer.innerHTML = '';
+
+      Object.entries(bioCounts).forEach(([bioName, count]) => {
+        const pct = Math.round((count / total) * 100);
+        const bColor = bioColors[bioName] || '#475569';
+        const desc = bioDescriptions[bioName] || '';
+
+        const item = document.createElement('div');
+        item.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem;';
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+            <span style="font-weight:700; color:#1e293b;">
+              ${escapeHtml(bioName)} <span style="font-weight:400; font-size:0.68rem; color:#64748b;">(${escapeHtml(desc)})</span>
+            </span>
+            <span style="font-weight:700; color:${bColor};">${count} (${pct}%)</span>
+          </div>
+          <div style="background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden;">
+            <div style="background:${bColor}; height:100%; width:${pct}%;"></div>
+          </div>
+        `;
+        biometricStatsContainer.appendChild(item);
+      });
+
+      // 3. Semáforo Fitosanitario
+      const rojo = [];
+      const amarillo = [];
+      const verde = [];
+
+      treeData.forEach(tree => {
+        const obs = (tree['Estado fitosanitario/Observaciones'] || '').toLowerCase();
+        if (obs.includes('comején') || obs.includes('hongos') || obs.includes('cañamulo') || obs.includes('comprometido') || obs.includes('deteriorado') || obs.includes('alto riesgo')) {
+          rojo.push(tree);
+        } else if (obs.includes('regular') || obs.includes('hojas secas') || obs.includes('manchas') || obs.includes('escaso') || obs.includes('crecimiento')) {
+          amarillo.push(tree);
+        } else {
+          verde.push(tree);
+        }
+      });
+
+      document.getElementById('kpi-risk').textContent = rojo.length;
+
+      const pctRojo = Math.round((rojo.length / total) * 100);
+      const pctAmarillo = Math.round((amarillo.length / total) * 100);
+      const pctVerde = Math.round((verde.length / total) * 100);
+
+      document.getElementById('txt-count-rojo').textContent = `${rojo.length} árboles (${pctRojo}%)`;
+      document.getElementById('bar-fill-rojo').style.width = `${pctRojo}%`;
+
+      document.getElementById('txt-count-amarillo').textContent = `${amarillo.length} árboles (${pctAmarillo}%)`;
+      document.getElementById('bar-fill-amarillo').style.width = `${pctAmarillo}%`;
+
+      document.getElementById('txt-count-verde').textContent = `${verde.length} árboles (${pctVerde}%)`;
+      document.getElementById('bar-fill-verde').style.width = `${pctVerde}%`;
+
+      fillDrawerList('list-rojo', rojo);
+      fillDrawerList('list-amarillo', amarillo);
+      fillDrawerList('list-verde', verde);
+
+      // 4. Ranking de Especies
+      const speciesCounts = {};
+      treeData.forEach(t => {
+        const name = t['Nombre comun'] || 'Sin clasificar';
+        speciesCounts[name] = (speciesCounts[name] || 0) + 1;
+      });
+
+      const sortedSpecies = Object.entries(speciesCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+      const rankingContainer = document.getElementById('species-ranking-container');
+      rankingContainer.innerHTML = '';
+
+      sortedSpecies.forEach(([name, count]) => {
+        const pct = Math.round((count / total) * 100);
+        const div = document.createElement('div');
+        div.style.cssText = 'background:white; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; font-size:0.75rem;';
+        div.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-weight:700;">
+            <span>${escapeHtml(name)}</span>
+            <span style="color:#1b5e20;">${count} (${pct}%)</span>
+          </div>
+          <div style="background:#e2e8f0; height:6px; border-radius:3px; overflow:hidden; margin-top:4px;">
+            <div style="background:#1b5e20; height:100%; width:${pct}%;"></div>
+          </div>
+        `;
+        rankingContainer.appendChild(div);
+      });
+
+      openModal('modal-stats');
+    }
+
+    function fillDrawerList(containerId, list) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (list.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:#64748b;">No hay árboles en esta categoría.</div>';
+        return;
+      }
+
+      list.forEach(tree => {
+        const item = document.createElement('div');
+        item.className = 'tree-sublist-item';
+        item.innerHTML = `
+          <div>
+            <b>#${tree.ID} - ${escapeHtml(tree['Nombre comun'])}</b> 
+            <span style="color:#64748b; font-size:0.7rem;">(${escapeHtml(tree.Zona)})</span><br>
+            <span style="color:#475569; font-size:0.7rem;">${escapeHtml(tree['Estado fitosanitario/Observaciones'])}</span>
+          </div>
+          <button class="btn-goto-tree" onclick="closeModal('modal-stats'); selectTree(${tree.ID}, true);">🎯 Ver</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function toggleSemaforoList(listId) {
+      const drawer = document.getElementById(listId);
+      drawer.style.display = drawer.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function openPrintModal() {
+      if (!isAdminLoggedIn) {
+        showToast("Debes iniciar sesión como Administrador para generar o imprimir placas QR.", "warning");
+        handleAdminAccessClick();
+        return;
+      }
+      renderPlacasPrint();
+      openModal('modal-print-qr');
+    }
+
+    function renderPlacasPrint() {
+      const zone = document.getElementById('print-zone-filter').value;
+      const filtered = treeData.filter(t => zone === 'ALL' || t.Zona === zone);
+      const grid = document.getElementById('print-placas-grid');
+      grid.innerHTML = '';
+
+      filtered.forEach(tree => {
+        grid.appendChild(createPlacaElement(tree));
+      });
+    }
+
+    function createPlacaElement(tree) {
+      const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+      const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+      const url = getTreeUrl(tree.ID);
+      const qrSvg = generateQrSvg(url, 80);
+
+      const div = document.createElement('div');
+      div.className = 'placa-qr-card';
+      div.innerHTML = `
+        <div class="placa-qr-header">
+          <h5>${escapeHtml(appSettings.schoolName)}</h5>
+          <span style="background:${ZONE_COLORS[tree.Zona]}; color:white; font-size:0.6rem; font-weight:700; padding:1px 5px; border-radius:4px;">${escapeHtml(tree.Zona)}</span>
+        </div>
+        <div class="placa-qr-body">
+          <div class="qr-render">${qrSvg}</div>
+          <div class="placa-qr-info">
+            <strong>#${tree.ID} ${escapeHtml(tree['Nombre comun'])}</strong>
+            <em>${escapeHtml(tree['Nombre científico'])} • (${escapeHtml(bot.family)})</em>
+            <div><b>Origen:</b> ${escapeHtml(bot.origin)}</div>
+            <div><b>Porte:</b> ${escapeHtml(tree['Clasificación biométrica'])}</div>
+            <div style="font-size:0.68rem; margin-top:3px; color:#1e293b;">
+              <b>Vector:</b> (${vec.dx}&icirc; + ${vec.dy}&jcirc;) m<br>
+              <b>Dist. al Origen:</b> ${vec.magnitud} m (${vec.cardinal})
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.62rem; color:#64748b; text-align:center; margin-top:6px; border-top:1px dotted #cbd5e1; padding-top:3px;">
+          Escanea para ver la ficha satelital interactiva en vivo<br>
+          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Autores: C. Cantero, L. Tirado, L. Jiménez &bull; Colab: A. Estrada Martinez &bull; INEM Montería</span>
+        </div>
+      `;
+      return div;
+    }
+
+    /* ESTACIÓN DE ROTULADO INDIVIDUAL DE ÁRBOLES & PLACAS */
+    function renderSinglePlacaStation() {
+      const select = document.getElementById('single-placa-tree-select');
+      if (!select) return;
+
+      const currentVal = parseInt(select.value);
+      select.innerHTML = '';
+      const sorted = [...treeData].sort((a,b) => a.ID - b.ID);
+      
+      sorted.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.ID;
+        opt.textContent = `#${t.ID} - ${t['Nombre comun']} (${t.Zona})`;
+        select.appendChild(opt);
+      });
+
+      if (sorted.length > 0) {
+        const targetId = (currentVal && sorted.some(t => t.ID === currentVal)) ? currentVal : sorted[0].ID;
+        select.value = targetId;
+        updateSinglePlacaPreview(targetId);
+      }
+    }
+
+    function updateSinglePlacaPreview(treeId) {
+      const tree = treeData.find(t => t.ID === parseInt(treeId));
+      const container = document.getElementById('single-placa-preview-target');
+      if (!tree || !container) return;
+
+      const vec = calculateVector(originCoord.lat, originCoord.lng, tree.Latitud, tree.Longitud);
+      const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+      const url = getTreeUrl(tree.ID);
+      const qrSvg = generateQrSvg(url, 120);
+
+      container.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #0f172a; padding-bottom:5px; margin-bottom:10px;">
+          <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#1b5e20;">
+            ${escapeHtml(appSettings.schoolName)}
+          </div>
+          <span style="background:${ZONE_COLORS[tree.Zona]}; color:white; font-size:0.67rem; font-weight:700; padding:2px 8px; border-radius:6px;">
+            ${escapeHtml(tree.Zona)}
+          </span>
+        </div>
+
+        <div style="display:flex; gap:14px; align-items:center; text-align:left;">
+          <div class="qr-render-large">
+            ${qrSvg}
+          </div>
+
+          <div style="flex:1; line-height:1.35; font-size:0.77rem; color:#1e293b;">
+            <div style="font-size:1.1rem; font-weight:900; color:#0f172a; margin-bottom:2px;">
+              #${tree.ID} ${escapeHtml(tree['Nombre comun'])}
+            </div>
+            <div style="font-style:italic; color:#475569; font-size:0.76rem; margin-bottom:4px;">
+              ${escapeHtml(tree['Nombre científico'])} • <b>(${escapeHtml(bot.family)})</b>
+            </div>
+            <div><b>Origen:</b> ${escapeHtml(bot.origin)}</div>
+            <div><b>Porte:</b> ${escapeHtml(tree['Clasificación biométrica'])}</div>
+            <div style="margin-top:4px; padding-top:4px; border-top:1px dashed #cbd5e1; font-size:0.72rem; color:#0f172a;">
+              <b>Vector r&#8407;:</b> (${vec.dx}&icirc; + ${vec.dy}&jcirc;) m<br>
+              <b>Distancia al Origen:</b> ${vec.magnitud} m • Rumbo: ${vec.rumbo}&deg; (${vec.cardinal})
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px; padding-top:6px; border-top:1px dotted #94a3b8; font-size:0.64rem; color:#475569; text-align:center;">
+          📱 <b>Escanea con tu teléfono para abrir la ficha interactiva en el mapa satelital</b><br>
+          <span style="font-size:0.58rem; color:#94a3b8;">&copy; Autores: C. Cantero, L. Tirado, L. Jiménez &bull; Colab: A. Estrada Martinez &bull; PRAE INEM Montería</span>
+        </div>
+      `;
+    }
+
+    async function downloadSinglePlacaImage() {
+      const select = document.getElementById('single-placa-tree-select');
+      const treeId = select ? select.value : '0';
+      const tree = treeData.find(t => t.ID === parseInt(treeId));
+      const target = document.getElementById('single-placa-preview-target');
+      const btn = document.getElementById('btn-download-single-png');
+
+      if (!target) return;
+
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ Generando PNG...';
+      btn.disabled = true;
+
+      try {
+        const canvas = await html2canvas(target, {
+          scale: 3,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false
+        });
+
+        const link = document.createElement('a');
+        const cleanName = tree ? tree['Nombre comun'].replace(/\s+/g, '_') : 'Arbol';
+        link.download = `PLACA_BOTANICA_ARBOL_${treeId}_${cleanName}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        showToast(`Placa del Árbol #${treeId} descargada en PNG de alta resolución.`, "success");
+      } catch (err) {
+        console.error("Error al exportar placa PNG:", err);
+        showToast("No se pudo generar la imagen de la placa.", "error");
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function printSinglePlacaDirect() {
+      document.body.classList.add('printing-single-placa');
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('printing-single-placa');
+      }, 1000);
+    }
+
+    function handleAdminAccessClick() {
+      if (isAdminLoggedIn) {
+        openSettingsModal();
+      } else {
+        document.getElementById('admin-pass-input').value = '';
+        document.getElementById('auth-error-msg').style.display = 'none';
+        openModal('modal-admin-auth');
+      }
+    }
+
+    function verifyAdminPassword() {
+      const entered = document.getElementById('admin-pass-input').value;
+      if (entered === adminPassword) {
+        isAdminLoggedIn = true;
+        document.body.classList.add('admin-logged');
+        closeModal('modal-admin-auth');
+        
+        const btnAdmin = document.getElementById('btn-admin-access');
+        btnAdmin.classList.add('admin-active');
+        btnAdmin.innerHTML = '⚙️ Admin ON';
+        
+        updateOriginMarker();
+        renderTrees();
+        renderSinglePlacaStation();
+        openSettingsModal();
+        showToast("Sesión de Administrador iniciada correctamente.", "success");
+      } else {
+        const errorMsg = document.getElementById('auth-error-msg');
+        errorMsg.style.display = 'block';
+        const input = document.getElementById('admin-pass-input');
+        input.style.borderColor = '#dc2626';
+        showToast("Contraseña incorrecta.", "error");
+      }
+    }
+
+    function lockAdminSession() {
+      isAdminLoggedIn = false;
+      document.body.classList.remove('admin-logged');
+      const btnAdmin = document.getElementById('btn-admin-access');
+      btnAdmin.classList.remove('admin-active');
+      btnAdmin.innerHTML = '🔒 Admin';
+      
+      closeModal('modal-settings');
+      closeModal('modal-print-qr');
+      updateOriginMarker();
+      renderTrees();
+      showToast("Sesión de Administrador bloqueada.", "info");
+    }
+
+    function openSettingsModal() {
+      document.getElementById('setting-school-name').value = appSettings.schoolName;
+      document.getElementById('setting-web-base-url').value = appSettings.webBaseUrl;
+      document.getElementById('setting-sb-url').value = appSettings.supabaseUrl || '';
+      document.getElementById('setting-sb-key').value = appSettings.supabaseKey || '';
+      document.getElementById('setting-sb-bucket').value = appSettings.supabaseBucket || 'fotos-arboles';
+
+      populateQuickEditDropdown();
+      renderSinglePlacaStation();
+
+      const newPassInp = document.getElementById('input-new-pass');
+      const confirmPassInp = document.getElementById('input-confirm-pass');
+      if (newPassInp) newPassInp.value = '';
+      if (confirmPassInp) confirmPassInp.value = '';
+      const passMsg = document.getElementById('pass-change-msg');
+      if (passMsg) passMsg.style.display = 'none';
+
+      if (!document.getElementById('tree-form-db-id').value && !document.getElementById('tree-form-number').value) {
+        const maxId = treeData.reduce((max, t) => Math.max(max, t.ID), 0);
+        document.getElementById('tree-form-number').value = maxId + 1;
+      }
+
+      openModal('modal-settings');
+    }
+
+    function switchAdminTab(tabId) {
+      document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      const targetBtn = document.getElementById(`btn-${tabId}`);
+      if (targetBtn) {
+        targetBtn.classList.add('active');
+      } else if (window.event && window.event.target && window.event.target.classList.contains('admin-tab-btn')) {
+        window.event.target.classList.add('active');
+      }
+      const targetContent = document.getElementById(tabId);
+      if (targetContent) targetContent.classList.add('active');
+
+      if (tabId === 'tab-single-qr') {
+        renderSinglePlacaStation();
+      }
+    }
+
+    function openAddTreeModal() {
+      if (!isAdminLoggedIn) {
+        handleAdminAccessClick();
+        return;
+      }
+      resetTreeForm();
+      const maxId = treeData.reduce((max, t) => Math.max(max, t.ID), 0);
+      document.getElementById('tree-form-number').value = maxId + 1;
+      openSettingsModal();
+      switchAdminTab('tab-arbol');
+    }
+
+    function autoFillBotanicalSuggestions(force = false) {
+      const sci = document.getElementById('tree-form-scientific').value;
+      const com = document.getElementById('tree-form-common').value;
+      const famInput = document.getElementById('tree-form-family');
+      const originSelect = document.getElementById('tree-form-origin');
+      const servInput = document.getElementById('tree-form-services');
+
+      if (!sci && !com) return;
+
+      const bot = getBotanicalInfo(sci, com, null);
+      if (bot) {
+        if (force || !famInput.value.trim() || famInput.value.trim() === 'Por determinar') {
+          famInput.value = bot.family || '';
+        }
+        if (force || !originSelect.value || originSelect.value === 'Por determinar') {
+          if (bot.native === true) originSelect.value = 'Nativa del Caribe';
+          else if (bot.native === false) originSelect.value = 'Introducida';
+          else originSelect.value = 'Por determinar';
+        }
+        if (force || !servInput.value.trim()) {
+          servInput.value = (bot.services || []).join(', ');
+        }
+      }
+    }
+
+    function openEditTreeModal(treeId) {
+      if (!isAdminLoggedIn) {
+        handleAdminAccessClick();
+        return;
+      }
+      const tree = treeData.find(t => t.ID === treeId);
+      if (!tree) return;
+
+      document.getElementById('tree-form-db-id').value = tree._db_id || '';
+      document.getElementById('tree-form-number').value = tree.ID;
+      document.getElementById('tree-form-zone').value = tree.Zona;
+      document.getElementById('tree-form-common').value = tree['Nombre comun'];
+      document.getElementById('tree-form-scientific').value = tree['Nombre científico'];
+      document.getElementById('tree-form-biometric').value = tree['Clasificación biométrica'];
+      document.getElementById('tree-form-observations').value = tree['Estado fitosanitario/Observaciones'];
+      document.getElementById('tree-form-lat').value = tree.Latitud;
+      document.getElementById('tree-form-lng').value = tree.Longitud;
+      document.getElementById('tree-form-existing-photo').value = tree['Enlace foto'] || '';
+
+      const bot = getBotanicalInfo(tree['Nombre científico'], tree['Nombre comun'], tree);
+      document.getElementById('tree-form-family').value = tree["Familia Botánica"] || bot.family || '';
+
+      const originVal = tree["Origen Biogeográfico"] || bot.origin || '';
+      if (originVal.toLowerCase().includes('nativ')) {
+        document.getElementById('tree-form-origin').value = 'Nativa del Caribe';
+      } else if (originVal.toLowerCase().includes('introducid')) {
+        document.getElementById('tree-form-origin').value = 'Introducida';
+      } else {
+        document.getElementById('tree-form-origin').value = 'Por determinar';
+      }
+
+      const servicesArray = Array.isArray(tree["Servicios Ecosistémicos"]) ? 
+        tree["Servicios Ecosistémicos"] : 
+        (tree["Servicios Ecosistémicos"] ? [tree["Servicios Ecosistémicos"]] : (bot.services || []));
+      document.getElementById('tree-form-services').value = servicesArray.join(', ');
+
+      const photoIndicator = document.getElementById('tree-form-photo-indicator');
+      if (photoIndicator) {
+        photoIndicator.style.display = tree['Enlace foto'] ? 'block' : 'none';
+      }
+
+      const banner = document.getElementById('tree-form-mode-banner');
+      if (banner) {
+        banner.style.display = 'flex';
+        document.getElementById('tree-form-mode-text').textContent = `✏️ Editando Árbol #${tree.ID} - ${tree['Nombre comun']} (${tree.Zona})`;
+      }
+      const btnSave = document.getElementById('btn-save-tree-record');
+      if (btnSave) {
+        btnSave.innerHTML = `💾 Actualizar Árbol #${tree.ID}`;
+        btnSave.style.background = '#2563eb';
+      }
+
+      const selectDropdown = document.getElementById('quick-select-edit-tree');
+      if (selectDropdown) selectDropdown.value = tree.ID;
+
+      openSettingsModal();
+      switchAdminTab('tab-arbol');
+    }
+
+    function handleIdInputChange(enteredId) {
+      const idNum = parseInt(enteredId);
+      if (!idNum) return;
+      const existing = treeData.find(t => t.ID === idNum);
+      if (existing) {
+        openEditTreeModal(idNum);
+        showToast(`Datos del árbol #${idNum} cargados para edición.`, "info");
+      } else {
+        document.getElementById('tree-form-db-id').value = '';
+        document.getElementById('tree-form-common').value = '';
+        document.getElementById('tree-form-scientific').value = '';
+        document.getElementById('tree-form-family').value = '';
+        document.getElementById('tree-form-origin').value = 'Por determinar';
+        document.getElementById('tree-form-services').value = '';
+        document.getElementById('tree-form-observations').value = '';
+        document.getElementById('tree-form-existing-photo').value = '';
+        document.getElementById('tree-form-lat').value = '';
+        document.getElementById('tree-form-lng').value = '';
+        
+        const photoIndicator = document.getElementById('tree-form-photo-indicator');
+        if (photoIndicator) photoIndicator.style.display = 'none';
+
+        const banner = document.getElementById('tree-form-mode-banner');
+        if (banner) banner.style.display = 'none';
+
+        const btnSave = document.getElementById('btn-save-tree-record');
+        if (btnSave) {
+          btnSave.innerHTML = `💾 Guardar Nuevo Espécimen #${idNum}`;
+          btnSave.style.background = 'var(--primary)';
+        }
+
+        const selectDropdown = document.getElementById('quick-select-edit-tree');
+        if (selectDropdown) selectDropdown.value = '';
+      }
+    }
+
+    function populateQuickEditDropdown() {
+      const select = document.getElementById('quick-select-edit-tree');
+      if (!select) return;
+      select.innerHTML = '<option value="">-- Elige un árbol de la lista --</option>';
+      const sorted = [...treeData].sort((a,b) => a.ID - b.ID);
+      sorted.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.ID;
+        opt.textContent = `#${t.ID} - ${t['Nombre comun']} (${t.Zona})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function handleQuickSelectTree(val) {
+      if (!val) {
+        resetTreeForm();
+        return;
+      }
+      openEditTreeModal(parseInt(val));
+    }
+
+    function resetTreeForm() {
+      document.getElementById('form-manage-tree').reset();
+      document.getElementById('tree-form-db-id').value = '';
+      document.getElementById('tree-form-existing-photo').value = '';
+      document.getElementById('tree-form-family').value = '';
+      document.getElementById('tree-form-origin').value = 'Por determinar';
+      document.getElementById('tree-form-services').value = '';
+      document.getElementById('tree-save-status').style.display = 'none';
+
+      const photoIndicator = document.getElementById('tree-form-photo-indicator');
+      if (photoIndicator) photoIndicator.style.display = 'none';
+
+      const banner = document.getElementById('tree-form-mode-banner');
+      if (banner) banner.style.display = 'none';
+
+      const selectDropdown = document.getElementById('quick-select-edit-tree');
+      if (selectDropdown) selectDropdown.value = '';
+
+      const btnSave = document.getElementById('btn-save-tree-record');
+      if (btnSave) {
+        btnSave.innerHTML = `💾 Guardar Espécimen`;
+        btnSave.style.background = 'var(--primary)';
+      }
+
+      const maxId = treeData.reduce((max, t) => Math.max(max, t.ID), 0);
+      document.getElementById('tree-form-number').value = maxId + 1;
+    }
+
+    function captureGpsLocation() {
+      if (!navigator.geolocation) {
+        showToast("Tu dispositivo no soporta geolocalización GPS.", "warning");
+        return;
+      }
+
+      const statusBox = document.getElementById('tree-save-status');
+      statusBox.style.display = 'block';
+      statusBox.style.color = '#2563eb';
+      statusBox.textContent = 'Buscando satélites GPS...';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('tree-form-lat').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('tree-form-lng').value = pos.coords.longitude.toFixed(6);
+          statusBox.style.color = '#16a34a';
+          statusBox.textContent = `✅ GPS fijado con precisión de ±${Math.round(pos.coords.accuracy)} metros.`;
+          showToast("Coordenadas GPS capturadas con éxito.", "success");
+        },
+        (err) => {
+          statusBox.style.color = '#dc2626';
+          statusBox.textContent = `Error de GPS: ${err.message}.`;
+          showToast(`Error de GPS: ${err.message}`, "error");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function startPickLocationOnMap() {
+      closeModal('modal-settings');
+      isPickingLocationForForm = true;
+      showToast("Haz clic sobre el mapa satelital en la posición del árbol.", "info");
+    }
+
+    async function handleSaveTree() {
+      const btnSave = document.getElementById('btn-save-tree-record');
+      const statusBox = document.getElementById('tree-save-status');
+      statusBox.style.display = 'block';
+      statusBox.style.color = '#2563eb';
+      statusBox.textContent = 'Guardando espécimen...';
+      btnSave.disabled = true;
+
+      try {
+        const dbId = document.getElementById('tree-form-db-id').value;
+        const treeNumber = parseInt(document.getElementById('tree-form-number').value);
+        const zone = document.getElementById('tree-form-zone').value;
+        const commonName = document.getElementById('tree-form-common').value.trim();
+        const scientificName = document.getElementById('tree-form-scientific').value.trim() || 'Desconocido';
+        const familyName = document.getElementById('tree-form-family').value.trim() || 'Por determinar';
+        const originName = document.getElementById('tree-form-origin').value;
+        const servicesText = document.getElementById('tree-form-services').value.trim();
+        const servicesArray = servicesText ? servicesText.split(',').map(s => s.trim()).filter(Boolean) : ["Cobertura vegetal urbana", "Confort ambiental"];
+        const biometric = document.getElementById('tree-form-biometric').value;
+        const observations = document.getElementById('tree-form-observations').value.trim();
+        const lat = parseFloat(document.getElementById('tree-form-lat').value);
+        const lng = parseFloat(document.getElementById('tree-form-lng').value);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new Error("Las coordenadas de latitud y longitud deben ser números válidos.");
+        }
+        
+        let photoUrl = document.getElementById('tree-form-existing-photo').value;
+        const fileInput = document.getElementById('tree-form-file');
+
+        if (fileInput.files.length > 0 && supabaseClient) {
+          statusBox.textContent = 'Subiendo fotografía a Supabase Storage...';
+          const file = fileInput.files[0];
+          const fileExt = file.name.split('.').pop();
+          const fileName = `arbol_${treeNumber}_${Date.now()}.${fileExt}`;
+          const bucketName = appSettings.supabaseBucket || 'fotos-arboles';
+
+          const { data: uploadData, error: uploadErr } = await supabaseClient.storage
+            .from(bucketName)
+            .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+          if (uploadErr) {
+            console.warn("Aviso al subir foto:", uploadErr.message);
+          } else {
+            const { data: publicUrlData } = supabaseClient.storage
+              .from(bucketName)
+              .getPublicUrl(fileName);
+            photoUrl = publicUrlData.publicUrl;
+          }
+        }
+
+        const payload = {
+          numero_arbol: treeNumber,
+          zona: zone,
+          nombre_comun: commonName,
+          nombre_cientifico: scientificName,
+          familia_botanica: familyName,
+          origen_biogeografico: originName,
+          servicios_ecosistemicos: servicesArray.join(', '),
+          clasificacion_biometrica: biometric,
+          estado_fitosanitario: observations,
+          latitud: lat,
+          longitud: lng,
+          foto_url: photoUrl
+        };
+
+        if (supabaseClient) {
+          statusBox.textContent = 'Sincronizando registro con la nube...';
+          if (dbId) {
+            const { error: updateErr } = await supabaseClient
+              .from('arboles')
+              .update(payload)
+              .eq('id', dbId);
+            if (updateErr) throw updateErr;
+          } else {
+            const { error: insertErr } = await supabaseClient
+              .from('arboles')
+              .insert([payload]);
+            if (insertErr) throw insertErr;
+          }
+          await fetchTreesFromSupabase();
+        } else {
+          const existingIndex = treeData.findIndex(t => t.ID === treeNumber);
+          const localRecord = {
+            ID: treeNumber,
+            Zona: zone,
+            "Nombre comun": commonName,
+            "Nombre científico": scientificName,
+            "Familia Botánica": familyName,
+            "Origen Biogeográfico": originName,
+            "Servicios Ecosistémicos": servicesArray,
+            "Clasificación biométrica": biometric,
+            "Estado fitosanitario/Observaciones": observations,
+            Latitud: lat,
+            Longitud: lng,
+            "Enlace foto": photoUrl
+          };
+
+          if (existingIndex >= 0) {
+            treeData[existingIndex] = localRecord;
+          } else {
+            treeData.push(localRecord);
+          }
+          syncDatasetState();
+        }
+
+        statusBox.style.color = '#16a34a';
+        statusBox.textContent = '✅ Árbol guardado y sincronizado con éxito.';
+        showToast(`Árbol #${treeNumber} guardado correctamente.`, "success");
+        setTimeout(() => {
+          closeModal('modal-settings');
+          selectTree(treeNumber, true);
+        }, 1000);
+
+      } catch (err) {
+        statusBox.style.color = '#dc2626';
+        statusBox.textContent = `Error al guardar: ${err.message}`;
+        showToast(`Error al guardar: ${err.message}`, "error");
+      } finally {
+        btnSave.disabled = false;
+      }
+    }
+
+    async function testAndSaveSupabaseConfig() {
+      const url = document.getElementById('setting-sb-url').value.trim();
+      const key = document.getElementById('setting-sb-key').value.trim();
+      const bucket = document.getElementById('setting-sb-bucket').value.trim() || 'fotos-arboles';
+
+      if (!url || !key) {
+        showToast("Ingresa la URL y la Anon Key de Supabase.", "warning");
+        return;
+      }
+
+      try {
+        const testClient = supabase.createClient(url, key);
+        const { error } = await testClient.from('arboles').select('id').limit(1);
+        if (error) throw error;
+
+        appSettings.supabaseUrl = url;
+        appSettings.supabaseKey = key;
+        appSettings.supabaseBucket = bucket;
+        localStorage.setItem('inem_app_settings', JSON.stringify(appSettings));
+
+        supabaseClient = testClient;
+        updateCloudStatusBadge(true, "Conectado");
+        showToast("Conexión con Supabase verificada con éxito.", "success");
+        fetchTreesFromSupabase();
+      } catch (err) {
+        showToast(`Error al conectar con Supabase: ${err.message}`, "error");
+      }
+    }
+
+    function saveGeneralSettings() {
+      appSettings.schoolName = document.getElementById('setting-school-name').value.trim() || 'INEM Lorenzo María Lleras • PRAE';
+      appSettings.webBaseUrl = document.getElementById('setting-web-base-url').value.trim();
+
+      localStorage.setItem('inem_app_settings', JSON.stringify(appSettings));
+      renderTrees();
+      renderSinglePlacaStation();
+      showToast("Configuración general de enlaces guardada.", "success");
+    }
+
+    function togglePassVisibility(inputId, btnId) {
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🔒';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    function updateAdminPassword() {
+      const newPass = document.getElementById('input-new-pass').value.trim();
+      const confirmPass = document.getElementById('input-confirm-pass').value.trim();
+      const msg = document.getElementById('pass-change-msg');
+      msg.style.display = 'block';
+
+      if (!newPass) {
+        msg.style.color = '#dc2626';
+        msg.textContent = '⚠️ La contraseña no puede estar vacía.';
+        showToast("La contraseña no puede estar vacía.", "warning");
+        return;
+      }
+
+      if (newPass.length < 4) {
+        msg.style.color = '#dc2626';
+        msg.textContent = '⚠️ Por seguridad, usa al menos 4 caracteres.';
+        showToast("Usa al menos 4 caracteres.", "warning");
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        msg.style.color = '#dc2626';
+        msg.textContent = '❌ Las contraseñas no coinciden.';
+        showToast("Las contraseñas no coinciden.", "error");
+        return;
+      }
+
+      adminPassword = newPass;
+      localStorage.setItem('inem_admin_pass', newPass);
+
+      msg.style.color = '#16a34a';
+      msg.textContent = '✅ ¡Contraseña actualizada y guardada con éxito!';
+      showToast("Contraseña de administrador actualizada.", "success");
+
+      document.getElementById('input-new-pass').value = '';
+      document.getElementById('input-confirm-pass').value = '';
+
+      setTimeout(() => {
+        msg.style.display = 'none';
+      }, 3500);
+    }
+
+    function restoreDefaultAdminPassPrompt() {
+      showConfirmDialog(
+        "Restaurar Contraseña",
+        "¿Deseas restaurar la clave de administrador a la predeterminada ('inem2026')?",
+        () => {
+          adminPassword = 'inem2026';
+          localStorage.removeItem('inem_admin_pass');
+          const msg = document.getElementById('pass-change-msg');
+          msg.style.display = 'block';
+          msg.style.color = '#16a34a';
+          msg.textContent = "✅ Clave restaurada a 'inem2026'.";
+          showToast("Clave restaurada a 'inem2026'.", "info");
+          setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        }
+      );
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.classList.remove('active');
+    }
+
+    document.getElementById('search-input').addEventListener('input', renderTrees);
+    document.getElementById('zone-filter').addEventListener('change', renderTrees);
+    document.getElementById('chk-show-zones').addEventListener('change', renderZonePolygons);
+    document.getElementById('chk-show-labels').addEventListener('change', renderZonePolygons);
+
+    document.getElementById('btn-open-stats').addEventListener('click', openStatsModal);
+    document.getElementById('btn-measure-vector').addEventListener('click', toggleMeasurementMode);
+    document.getElementById('btn-export-excel').addEventListener('click', exportToExcelCSV);
+    document.getElementById('btn-open-print-qr').addEventListener('click', openPrintModal);
+    document.getElementById('btn-toggle-fullscreen').addEventListener('click', toggleFullscreen);
+    document.getElementById('btn-admin-access').addEventListener('click', handleAdminAccessClick);
+
+    const btnOrigin = document.getElementById('btn-change-origin');
+    btnOrigin.addEventListener('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      if (!isAdminLoggedIn) {
+        showToast("Solo el Administrador puede reubicar el origen.", "warning");
+        return;
+      }
+      isSettingOrigin = !isSettingOrigin;
+      btnOrigin.textContent = isSettingOrigin ? 'Haz clic en el mapa...' : 'Mover Origen';
+      btnOrigin.style.background = isSettingOrigin ? '#dc2626' : 'var(--primary)';
+      if (isSettingOrigin) {
+        showToast("Haz clic en cualquier punto del mapa para fijar el nuevo origen (0,0).", "info");
+      }
+    });
+
+    map.on('click', (e) => {
+      if (isSettingOrigin) {
+        originCoord.lat = e.latlng.lat;
+        originCoord.lng = e.latlng.lng;
+        isSettingOrigin = false;
+        btnOrigin.textContent = 'Mover Origen';
+        btnOrigin.style.background = 'var(--primary)';
+        updateOriginMarker();
+        renderTrees();
+        renderSinglePlacaStation();
+        if (selectedTreeId) selectTree(selectedTreeId, false);
+        showToast("Origen reubicado con éxito.", "success");
+      } else if (isPickingLocationForForm) {
+        isPickingLocationForForm = false;
+        openSettingsModal();
+        switchAdminTab('tab-arbol');
+        document.getElementById('tree-form-lat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('tree-form-lng').value = e.latlng.lng.toFixed(6);
+        showToast("Ubicación geográfica asignada al formulario.", "success");
+      } else {
+        clearVectorLine();
+      }
+    });
+
+    function checkUrlHash() {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#tree-')) {
+        const id = parseInt(hash.replace('#tree-', ''));
+        if (!isNaN(id)) {
+          setTimeout(() => {
+            selectTree(id, true);
+          }, 600);
+        }
+      }
+    }
+
+    updateOriginMarker();
+    syncDatasetState();
+    setupZoomLabelManager();
+    initSupabase();
+    checkUrlHash();
+    window.addEventListener('hashchange', checkUrlHash);
+  </script>
+</body>
+</html>
